@@ -135,8 +135,8 @@ class Client(commands.Bot):
         self.tree.add_command(qotd_group)
 
         #TEMP
-        self.tree.clear_commands(guild=None)
-        await self.tree.sync()
+        #self.tree.clear_commands(guild=None)
+        #await self.tree.sync()
 
         guild = discord.Object(id=GUILD_ID)
         self.tree.copy_global_to(guild=guild)
