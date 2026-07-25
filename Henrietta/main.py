@@ -134,15 +134,16 @@ class Client(commands.Bot):
         self.tree.add_command(uwu)
         self.tree.add_command(qotd_group)
 
-        # Sync to guild for faster testing / immediate availability
+        #TEMP
+        self.tree.clear_commands(guild=None)
+        await self.tree.sync()
+
         guild = discord.Object(id=GUILD_ID)
         self.tree.copy_global_to(guild=guild)
         synced = await self.tree.sync(guild=guild)
 
-        # Other setup
         setup_starboard(self)
 
-        # Start recurring tasks
         if not auto_post_qotd.is_running():
             auto_post_qotd.start()
 
