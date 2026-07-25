@@ -38,33 +38,6 @@ def set_bot(bot_instance):
     global bot
     bot = bot_instance
 
-
-# =========================
-# DB SCHEMA
-# =========================
-CREATE TABLE `qotd_suggestions` (
-   `id` int(11) NOT NULL AUTO_INCREMENT,
-   `guild_id` bigint(20) NOT NULL,
-   `user_id` bigint(20) NOT NULL,
-   `author` varchar(225) NOT NULL,
-   `question` text NOT NULL,
-   `review_message_id` bigint(20) DEFAULT NULL,
-   `timestamp` timestamp NOT NULL DEFAULT current_timestamp(),
-   PRIMARY KEY (`id`)
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
- CREATE TABLE `qotd_suggestion_denials` (
-   `id` int(11) NOT NULL AUTO_INCREMENT,
-   `guild_id` bigint(20) NOT NULL,
-   `user_id` bigint(20) NOT NULL,
-   `denied_by_name` varchar(225) NOT NULL,
-   `question` text NOT NULL,
-   `reason` text DEFAULT NULL,
-   `timestamp` timestamp NOT NULL DEFAULT current_timestamp(),
-   PRIMARY KEY (`id`)
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-
 def _can_review(member: discord.Member) -> bool:
     if member.guild_permissions.manage_guild:
         return True
