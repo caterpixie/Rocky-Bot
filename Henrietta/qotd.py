@@ -186,9 +186,13 @@ class DenyReasonModal(ui.Modal, title="Deny QOTD Suggestion"):
 
         # DM the submitter, mirroring the confessions denial embed style
         dm_embed = discord.Embed(
-            title="Your QOTD Suggestion Wasn't Approved",
-            description=suggestion["question"],
+            description="Your QOTD Suggestion Wasn't Approved",
             color=discord.Color.red(),
+        )
+        dm_embed.add_field(
+            name="Question",
+            value=suggestion["question"],
+            inline=False,
         )
         dm_embed.add_field(
             name="Reason",
@@ -276,10 +280,21 @@ class QOTDReviewView(ui.View):
         approved_embed.add_field(name="Approved by", value=interaction.user.mention, inline=False)
         await interaction.response.edit_message(embed=approved_embed, view=None)
 
+        # DM the submitter that their suggestion was approved
+        dm_embed = discord.Embed(
+            description="Your QOTD Suggestion Was Approved!",
+            color=discord.Color.green(),
+        )
+        dm_embed.add_field(
+            name="Question",
+            value=suggestion["question"],
+            inline=False,
+        )
+
         member = interaction.guild.get_member(suggestion["user_id"])
         if member:
             try:
-                await member.send("Your QOTD suggestion was approved and added to the queue!")
+                await member.send(embed=dm_embed)
             except discord.Forbidden:
                 pass
 
