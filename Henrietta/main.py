@@ -29,6 +29,13 @@ from tickets import (
     CloseTicketView,
     ConfirmCloseView,
 )
+from qotd import (
+    qotd_group,
+    set_bot as set_qotd_bot,
+    register_persistent_views as register_qotd_views,
+    auto_post_qotd,
+)
+
 
 # =========================
 # CONFIG
@@ -107,12 +114,14 @@ class Client(commands.Bot):
         set_ticket_bot(self)
         set_confessions_bot(self)
         set_uwu_bot(self)
+        set_qotd_bot(self)
 
         # Persistent views
         self.add_view(TicketPanelView())
         self.add_view(CloseTicketView())
         self.add_view(ConfirmCloseView())
         self.add_view(ConfessionInteractionView(self))
+        register_qotd_views(self)
 
         # Restore confession approval buttons on restart
         await restore_pending_confessions(self)
@@ -123,7 +132,8 @@ class Client(commands.Bot):
         self.tree.add_command(confession_group)
         self.tree.add_command(reply_to_confession_context)
         self.tree.add_command(uwu)
-        
+        self.tree.add_command(qotd_group)
+
         # Sync to guild for faster testing / immediate availability
         guild = discord.Object(id=GUILD_ID)
         self.tree.copy_global_to(guild=guild)
@@ -131,6 +141,10 @@ class Client(commands.Bot):
 
         # Other setup
         setup_starboard(self)
+
+        # Start recurring tasks
+        if not auto_post_qotd.is_running():
+            auto_post_qotd.start()
 
         print(f"Synced commands to guild {GUILD_ID}: {[cmd.name for cmd in synced]}")
 
