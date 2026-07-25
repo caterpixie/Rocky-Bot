@@ -8,10 +8,14 @@ import aiomysql
 # =========================
 # CONFIGURATION
 # =========================
-QOTD_CHANNEL_ID = 
-QOTD_ROLE_ID = 
+QOTD_CHANNEL_ID = 1530456978072141966
+QOTD_ROLE_ID = 1530020464293056624
 
-# Do not change timezone, it needs to stay America/Chicago to work with PebbleHost's server. Time is 1 hour behind on CST
+QOTD_MOD_CHANNEL_ID = 1482168928045367349
+
+QOTD_MOD_ROLE_ID = None
+
+# Do not change timezone, it needs to stay America/Chicago to work with PebbleHost's server. Time is 1 hour behind on EST
 TIMEZONE_NAME = "America/Chicago" 
 AUTO_POST_HOUR = 15          
 AUTO_POST_MINUTE = 20      
@@ -19,8 +23,10 @@ AUTO_POST_MINUTE = 20
 THREAD_NAME = "Answers"
 THREAD_AUTO_ARCHIVE_MINUTES = 1440
 
-EMBED_COLOR = ""
+EMBED_COLOR = "FFC6D6"
 QUEUE_PAGE_SIZE = 10
+
+SUGGEST_BUTTON_LABEL = "Suggest a Question"
 
 # =========================
 # BOT HOOKUP
@@ -31,6 +37,40 @@ bot = None
 def set_bot(bot_instance):
     global bot
     bot = bot_instance
+
+
+# =========================
+# DB SCHEMA
+# =========================
+CREATE TABLE `qotd_suggestions` (
+   `id` int(11) NOT NULL AUTO_INCREMENT,
+   `guild_id` bigint(20) NOT NULL,
+   `user_id` bigint(20) NOT NULL,
+   `author` varchar(225) NOT NULL,
+   `question` text NOT NULL,
+   `review_message_id` bigint(20) DEFAULT NULL,
+   `timestamp` timestamp NOT NULL DEFAULT current_timestamp(),
+   PRIMARY KEY (`id`)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ CREATE TABLE `qotd_suggestion_denials` (
+   `id` int(11) NOT NULL AUTO_INCREMENT,
+   `guild_id` bigint(20) NOT NULL,
+   `user_id` bigint(20) NOT NULL,
+   `denied_by_name` varchar(225) NOT NULL,
+   `question` text NOT NULL,
+   `reason` text DEFAULT NULL,
+   `timestamp` timestamp NOT NULL DEFAULT current_timestamp(),
+   PRIMARY KEY (`id`)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+def _can_review(member: discord.Member) -> bool:
+    if member.guild_permissions.manage_guild:
+        return True
+    if QOTD_MOD_ROLE_ID:
+        return any(role.id == QOTD_MOD_ROLE_ID for role in member.roles)
+    return False
 
 
 class Pages(ui.View):
@@ -58,6 +98,218 @@ class Pages(ui.View):
             self.update_buttons()
             await interaction.response.edit_message(embed=self.embeds[self.current_page], view=self)
 
+
+# =========================
+# QOTD SUGGESTIONS
+# =========================
+
+class SuggestQOTDModal(ui.Modal, title="Suggest a Question"):
+    question = ui.TextInput(
+        label="Your question",
+        style=discord.TextStyle.paragraph,
+        max_length=1000,
+        placeholder="What's your QOTD idea?",
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        guild = interaction.guild
+        mod_channel = guild.get_channel(QOTD_MOD_CHANNEL_ID) if QOTD_MOD_CHANNEL_ID else None
+        if not mod_channel:
+            await interaction.response.send_message(
+                "Sorry, QOTD suggestions aren't set up right now. Try again later.",
+                ephemeral=True,
+            )
+            return
+
+        review_embed = discord.Embed(
+            title="New QOTD Suggestion",
+            description=str(self.question),
+            color=discord.Color.from_str(EMBED_COLOR),
+        )
+        review_embed.set_footer(text=f"Suggested by {interaction.user} | {interaction.user.id}")
+
+        review_message = await mod_channel.send(embed=review_embed, view=QOTDReviewView())
+
+        async with bot.pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """
+                    INSERT INTO qotd_suggestions (guild_id, user_id, author, question, review_message_id)
+                    VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    (
+                        guild.id,
+                        interaction.user.id,
+                        interaction.user.name,
+                        str(self.question),
+                        review_message.id,
+                    ),
+                )
+
+        await interaction.response.send_message(
+            "Thanks! Your question was submitted for review.", ephemeral=True
+        )
+
+
+class SuggestQOTDView(ui.View):
+    """Attached to every posted QOTD embed. Persistent across restarts."""
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @ui.button(
+        label=SUGGEST_BUTTON_LABEL,
+        style=discord.ButtonStyle.secondary,
+        custom_id="qotd_suggest_open",
+    )
+    async def suggest(self, interaction: discord.Interaction, button: ui.Button):
+        await interaction.response.send_modal(SuggestQOTDModal())
+
+
+class DenyReasonModal(ui.Modal, title="Deny QOTD Suggestion"):
+    reason = ui.TextInput(
+        label="Reason (sent to the user)",
+        style=discord.TextStyle.paragraph,
+        max_length=1000,
+        required=False,
+        placeholder="Optional note to the submitter",
+    )
+
+    def __init__(self, suggestion, review_message: discord.Message):
+        super().__init__()
+        self.suggestion = suggestion
+        self.review_message = review_message
+
+    async def on_submit(self, interaction: discord.Interaction):
+        suggestion = self.suggestion
+        reason_text = str(self.reason) if self.reason else None
+
+        async with bot.pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """
+                    INSERT INTO qotd_suggestion_denials
+                        (guild_id, user_id, denied_by_name, question, reason)
+                    VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    (
+                        suggestion["guild_id"],
+                        suggestion["user_id"],
+                        interaction.user.name,
+                        suggestion["question"],
+                        reason_text,
+                    ),
+                )
+                await cur.execute("DELETE FROM qotd_suggestions WHERE id = %s", (suggestion["id"],))
+
+        denied_embed = discord.Embed(
+            title="QOTD Suggestion Denied",
+            description=suggestion["question"],
+            color=discord.Color.red(),
+        )
+        denied_embed.add_field(name="Denied by", value=interaction.user.mention, inline=False)
+        if reason_text:
+            denied_embed.add_field(name="Reason", value=reason_text, inline=False)
+        await self.review_message.edit(embed=denied_embed, view=None)
+
+        member = interaction.guild.get_member(suggestion["user_id"])
+        if member:
+            try:
+                if reason_text:
+                    await member.send(
+                        f"Your QOTD suggestion wasn't approved: {reason_text}"
+                    )
+                else:
+                    await member.send("Your QOTD suggestion wasn't approved.")
+            except discord.Forbidden:
+                pass
+
+        await interaction.response.send_message("Suggestion denied.", ephemeral=True)
+
+
+class QOTDReviewView(ui.View):
+    """Attached to suggestion review messages in the mod channel. Persistent across restarts."""
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    async def _fetch_suggestion(self, message_id: int):
+        async with bot.pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                await cur.execute(
+                    "SELECT * FROM qotd_suggestions WHERE review_message_id = %s",
+                    (message_id,),
+                )
+                return await cur.fetchone()
+
+    @ui.button(label="Approve", style=discord.ButtonStyle.success, custom_id="qotd_review_approve")
+    async def approve(self, interaction: discord.Interaction, button: ui.Button):
+        if not _can_review(interaction.user):
+            await interaction.response.send_message(
+                "You don't have permission to review QOTD suggestions.", ephemeral=True
+            )
+            return
+
+        suggestion = await self._fetch_suggestion(interaction.message.id)
+        if not suggestion:
+            await interaction.response.send_message(
+                "This suggestion has already been reviewed.", ephemeral=True
+            )
+            return
+
+        async with bot.pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """
+                    INSERT INTO qotds (guild_id, question, author, is_published, image_url)
+                    VALUES (%s, %s, %s, FALSE, NULL)
+                    """,
+                    (suggestion["guild_id"], suggestion["question"], suggestion["author"]),
+                )
+                await cur.execute("DELETE FROM qotd_suggestions WHERE id = %s", (suggestion["id"],))
+
+        approved_embed = discord.Embed(
+            title="QOTD Suggestion Approved",
+            description=suggestion["question"],
+            color=discord.Color.green(),
+        )
+        approved_embed.add_field(name="Approved by", value=interaction.user.mention, inline=False)
+        await interaction.response.edit_message(embed=approved_embed, view=None)
+
+        member = interaction.guild.get_member(suggestion["user_id"])
+        if member:
+            try:
+                await member.send("Your QOTD suggestion was approved and added to the queue!")
+            except discord.Forbidden:
+                pass
+
+    @ui.button(label="Deny", style=discord.ButtonStyle.danger, custom_id="qotd_review_deny")
+    async def deny(self, interaction: discord.Interaction, button: ui.Button):
+        if not _can_review(interaction.user):
+            await interaction.response.send_message(
+                "You don't have permission to review QOTD suggestions.", ephemeral=True
+            )
+            return
+
+        suggestion = await self._fetch_suggestion(interaction.message.id)
+        if not suggestion:
+            await interaction.response.send_message(
+                "This suggestion has already been reviewed.", ephemeral=True
+            )
+            return
+
+        await interaction.response.send_modal(DenyReasonModal(suggestion, interaction.message))
+
+
+def register_persistent_views(bot_instance):
+    """Call once, e.g. in on_ready/setup_hook, so buttons survive restarts."""
+    bot_instance.add_view(SuggestQOTDView())
+    bot_instance.add_view(QOTDReviewView())
+
+
+# =========================
+# COMMANDS
+# =========================
 
 class QOTDGroup(app_commands.Group):
     def __init__(self):
@@ -127,6 +379,7 @@ async def post_qotd(interaction: discord.Interaction):
     message = await channel.send(
         content=f"<@&{QOTD_ROLE_ID}>",
         embed=embed,
+        view=SuggestQOTDView(),
         allowed_mentions=discord.AllowedMentions(roles=True),
     )
 
@@ -245,6 +498,7 @@ async def auto_post_qotd():
         message = await qotd_channel.send(
             content=f"<@&{QOTD_ROLE_ID}>",
             embed=embed,
+            view=SuggestQOTDView(),
             allowed_mentions=discord.AllowedMentions(roles=True),
         )
         await message.create_thread(name=THREAD_NAME, auto_archive_duration=THREAD_AUTO_ARCHIVE_MINUTES)
