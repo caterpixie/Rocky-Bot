@@ -10,10 +10,9 @@ import aiomysql
 # =========================
 QOTD_CHANNEL_ID = 1530456978072141966
 QOTD_ROLE_ID = 1530020464293056624
-
 QOTD_MOD_CHANNEL_ID = 1482168928045367349
-
 QOTD_MOD_ROLE_ID = None
+QOTD_LOG_CHANNEL_ID = 1496371813259939891
 
 # Do not change timezone, it needs to stay America/Chicago to work with PebbleHost's server. Time is 1 hour behind on EST
 TIMEZONE_NAME = "America/Chicago" 
@@ -23,7 +22,7 @@ AUTO_POST_MINUTE = 20
 THREAD_NAME = "Answers"
 THREAD_AUTO_ARCHIVE_MINUTES = 1440
 
-EMBED_COLOR = "#FFC6D6"
+EMBED_COLOR = "FFC6D6"
 QUEUE_PAGE_SIZE = 10
 
 SUGGEST_BUTTON_LABEL = "Suggest a Question"
@@ -185,17 +184,45 @@ class DenyReasonModal(ui.Modal, title="Deny QOTD Suggestion"):
             denied_embed.add_field(name="Reason", value=reason_text, inline=False)
         await self.review_message.edit(embed=denied_embed, view=None)
 
+        # DM the submitter, mirroring the confessions denial embed style
+        dm_embed = discord.Embed(
+            title="Your QOTD Suggestion Wasn't Approved",
+            description=suggestion["question"],
+            color=discord.Color.red(),
+        )
+        dm_embed.add_field(
+            name="Reason",
+            value=reason_text if reason_text else "No reason given.",
+            inline=False,
+        )
+
         member = interaction.guild.get_member(suggestion["user_id"])
         if member:
             try:
-                if reason_text:
-                    await member.send(
-                        f"Your QOTD suggestion wasn't approved: {reason_text}"
-                    )
-                else:
-                    await member.send("Your QOTD suggestion wasn't approved.")
+                await member.send(embed=dm_embed)
             except discord.Forbidden:
                 pass
+
+        # Log the denial to the QOTD log channel
+        log_channel = interaction.guild.get_channel(QOTD_LOG_CHANNEL_ID) if QOTD_LOG_CHANNEL_ID else None
+        if log_channel:
+            log_embed = discord.Embed(
+                title="QOTD Suggestion Denied",
+                description=suggestion["question"],
+                color=discord.Color.red(),
+            )
+            log_embed.add_field(
+                name="Submitted by",
+                value=f"{suggestion['author']} ({suggestion['user_id']})",
+                inline=False,
+            )
+            log_embed.add_field(name="Denied by", value=interaction.user.mention, inline=False)
+            log_embed.add_field(
+                name="Reason",
+                value=reason_text if reason_text else "No reason given.",
+                inline=False,
+            )
+            await log_channel.send(embed=log_embed)
 
         await interaction.response.send_message("Suggestion denied.", ephemeral=True)
 
