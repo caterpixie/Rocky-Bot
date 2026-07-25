@@ -298,6 +298,22 @@ class QOTDReviewView(ui.View):
             except discord.Forbidden:
                 pass
 
+        # Log the approval to the QOTD log channel
+        log_channel = interaction.guild.get_channel(QOTD_LOG_CHANNEL_ID) if QOTD_LOG_CHANNEL_ID else None
+        if log_channel:
+            log_embed = discord.Embed(
+                title="QOTD Suggestion Approved",
+                description=suggestion["question"],
+                color=discord.Color.green(),
+            )
+            log_embed.add_field(
+                name="Submitted by",
+                value=f"{suggestion['author']} ({suggestion['user_id']})",
+                inline=False,
+            )
+            log_embed.add_field(name="Approved by", value=interaction.user.mention, inline=False)
+            await log_channel.send(embed=log_embed)
+
     @ui.button(label="Deny", style=discord.ButtonStyle.danger, custom_id="qotd_review_deny")
     async def deny(self, interaction: discord.Interaction, button: ui.Button):
         if not _can_review(interaction.user):
