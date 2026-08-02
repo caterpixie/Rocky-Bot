@@ -272,14 +272,6 @@ class QOTDReviewView(ui.View):
                 )
                 await cur.execute("DELETE FROM qotd_suggestions WHERE id = %s", (suggestion["id"],))
 
-        approved_embed = discord.Embed(
-            title="QOTD Suggestion Approved",
-            description=suggestion["question"],
-            color=discord.Color.green(),
-        )
-        approved_embed.add_field(name="Approved by", value=interaction.user.mention, inline=False)
-        await interaction.response.edit_message(embed=approved_embed, view=None)
-
         # DM the submitter that their suggestion was approved
         dm_embed = discord.Embed(
             description="Your QOTD Suggestion Was Approved!",
