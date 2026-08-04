@@ -15,7 +15,6 @@ SCRIPTURE_CHANNEL_ID = 1486956103207096340
 OFFICIAL_MOD_CHANNEL_ID = 1482168928045367349
 
 MINOR_ROLE_ID = 1486955537286299700
-MINOR_ALERT_PING_ROLE_ID = 1486955771303301291
 
 # ======================================
 # BOT HOOKUP
@@ -222,13 +221,12 @@ async def log_member_update(before: discord.Member, after: discord.Member):
     if minor_added:
         minor_embed = discord.Embed(
             title="Stinky Minor Alert",
-            description=f"User {before.mention} has selected the -17 role. SIC 'EM",
+            description=f"User {before.mention} has selected the -17 role. They have been permanently muted until they open a ticket.",
             color=discord.Color.red(),
         )
         minor_embed.set_footer(text=f"ID:{before.id}")
         mod_channel = bot.get_channel(OFFICIAL_MOD_CHANNEL_ID)
         if mod_channel:
-            role_mention = f"<@&{MINOR_ALERT_PING_ROLE_ID}>"
             await mod_channel.send(content=role_mention, embed=minor_embed)
 
 
