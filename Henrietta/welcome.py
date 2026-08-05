@@ -6,8 +6,6 @@ from datetime import datetime, timezone
 # ======================================
 
 SERVER_ID = 1480390027593777287
-
-WELCOME_CHANNEL_ID = 1482168928045367346
 RULES_CHANNEL_ID = 1482168928045367346
 
 EMBED_COLOR = "#FFC6D6"
@@ -75,4 +73,8 @@ async def on_member_join_welcome(member: discord.Member):
     embed.set_thumbnail(url=icon_url)
     embed.set_footer(text=f"Member #{member.guild.member_count}")
 
-    await welcome_channel.send(content=member.mention, embed=embed, ephemeral=True)
+    try:
+        await member.send(embed=embed)
+    except (discord.Forbidden, discord.HTTPException):
+        print(f"[welcome] Couldn't DM {member} — skipping.")
+        return
