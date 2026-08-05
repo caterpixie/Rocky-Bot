@@ -60,7 +60,7 @@ async def on_member_join_welcome(member: discord.Member):
         title=f"Welcome to {member.guild.name}, {member.display_name}!",
         description=(
             f"**Get your ass over to {rules_mention} and accept the rules** to unlock the rest of the server~\n\n"
-            f"Then (if you wanna) you can use this template to introduce yourself to the sever in <#1498057003220865126>! <:m_happi:1482560583890112694>\n"
+            f"Then, (if you wanna) you can use this template to introduce yourself to the server in <#1498057003220865126>! <:m_happi:1482560583890112694>\n"
         ),
         color=discord.Color.from_str(EMBED_COLOR),
     )
