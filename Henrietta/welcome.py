@@ -45,32 +45,18 @@ async def on_member_join_welcome(member: discord.Member):
     if member.guild.id != SERVER_ID:
         return
 
-    welcome_channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
-    if not welcome_channel:
-        print(f"[welcome] Could not find welcome channel (ID: {WELCOME_CHANNEL_ID})")
-        return
-
-    rules_mention = (
-        f"<#{RULES_CHANNEL_ID}>" if RULES_CHANNEL_ID else "the rules channel"
-    )
+    rules_mention = f"<#{RULES_CHANNEL_ID}>" if RULES_CHANNEL_ID else "the rules channel"
 
     embed = discord.Embed(
         title=f"Welcome to {member.guild.name}, {member.display_name}!",
         description=(
             f"**Get your ass over to {rules_mention} and accept the rules** to unlock the rest of the server~\n\n"
-            f"Then, (if you wanna) you can use this template to introduce yourself to the server in <#1498057003220865126>! <:m_happi:1482560583890112694>\n"
+            f"Then (if you wanna) you can use this template to introduce yourself to the server in <#1498057003220865126>! <:m_happi:1482560583890112694>\n"
         ),
         color=discord.Color.from_str(EMBED_COLOR),
     )
-
-    embed.add_field(
-        name="Intro Template",
-        value=INTRO_TEMPLATE,
-        inline=False
-    )
-
-    icon_url = member.avatar.url if member.avatar else member.default_avatar.url
-    embed.set_thumbnail(url=icon_url)
+    embed.add_field(name="Intro Template", value=INTRO_TEMPLATE, inline=False)
+    embed.set_thumbnail(url=member.display_avatar.url)
     embed.set_footer(text=f"Member #{member.guild.member_count}")
 
     try:
