@@ -19,6 +19,8 @@ SUPPORT_CATEGORY_ID = 1487175936230293747
 LOG_CHANNEL_ID = 1487175733884354650
 
 MOD_ROLE_IDS = {
+    1534010789944627320,
+    1486955771303301291
 }
 
 # For the embeds created in the individual ticket channels for the user
