@@ -13,7 +13,7 @@ STICKY_DEBOUNCE_SECONDS = 3
 
 ART_PANEL = {
     "title": "<:x_staricon:1523500147085021318> Share Your Art",
-    "description": "Click the button below to submit your art! You'll be asked for a title, an optional description, and up to {max_images} images, all in one form.\n\nOnce submitted, it'll be posted here with its own thread to keep discussions to their own post only.",
+    "description": "Click the button below to submit your art! You'll be asked for a title, an optional description, and up to {max_images} images.\n\nOnce submitted, it'll be posted here with its own thread to keep discussions to their own post only.",
     "color": "#FFC6D6",
 }
 
