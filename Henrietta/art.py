@@ -25,8 +25,6 @@ THREAD_AUTO_ARCHIVE_MINUTES = 1440
 # ============================================================
 
 bot = None
-_current_sticky_ids: dict[int, int] = {}
-
 def set_bot(bot_instance):
     global bot
     bot = bot_instance
@@ -77,8 +75,6 @@ async def _repost_sticky(channel: discord.TextChannel):
             pass
 
     new_message = await channel.send(embed=_build_art_panel_embed(), view=ArtPanelView())
-
-    _current_sticky_ids[channel.id] = new_message.id
     await _set_sticky_message_id(channel.id, new_message.id)
 
 
@@ -95,8 +91,7 @@ async def _debounced_repost(channel: discord.TextChannel):
 async def _on_message_for_sticky(message: discord.Message):
     if message.channel.id != ART_CHANNEL_ID:
         return
-        
-    if _current_sticky_ids.get(message.channel.id) == message.id:
+    if message.author.id == bot.user.id and message.components:
         return
 
     existing_task = _pending_repost_tasks.get(message.channel.id)
@@ -224,7 +219,6 @@ async def art_setup(interaction: discord.Interaction):
             pass
 
     new_message = await channel.send(embed=_build_art_panel_embed(), view=ArtPanelView())
-    _current_sticky_ids[channel.id] = new_message.id
     await _set_sticky_message_id(channel.id, new_message.id)
 
     await interaction.response.send_message("Art panel sent!", ephemeral=True)
