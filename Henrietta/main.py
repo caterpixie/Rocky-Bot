@@ -40,6 +40,11 @@ from moddinghelp import (
     set_bot as set_modhelp_bot,
     MenuView,
 )
+from art import (
+    art_group,
+    set_bot as set_art_bot,
+    ArtPanelView,
+)
 
 # =========================
 # CONFIG
@@ -113,12 +118,14 @@ class Client(commands.Bot):
         set_uwu_bot(self)
         set_qotd_bot(self)
         set_modhelp_bot(self)
+        set_art_bot(self)
 
         self.add_view(TicketPanelView())
         self.add_view(CloseTicketView())
         self.add_view(ConfirmCloseView())
         self.add_view(ConfessionInteractionView(self))
         self.add_view(MenuView())
+        self.add_view(ArtPanelView())
         register_qotd_views(self)
 
         await restore_pending_confessions(self)
@@ -130,6 +137,7 @@ class Client(commands.Bot):
         self.tree.add_command(uwu)
         self.tree.add_command(qotd_group)
         self.tree.add_command(modhelp_group)
+        self.tree.add_command(art_group)
 
         #TEMP ONLY IF DUPE COMMANDS
         #self.tree.clear_commands(guild=None)
@@ -149,11 +157,6 @@ class Client(commands.Bot):
     async def on_ready(self):
         print(f"Logged on as {self.user} (ID: {self.user.id})")
         print("Bot is ready.")
-
-
-# =========================
-# STARTUP
-# =========================
 
 intents = discord.Intents.default()
 intents.message_content = True
