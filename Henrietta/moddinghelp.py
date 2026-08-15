@@ -17,7 +17,7 @@ MENU_PANEL = {
 }
 
 MENU_OPTIONS = {
-    "": {
+    "gml-changed": {
         "label": "Game GML changed. Unable to install.",
         "response": {
             "embed": {
