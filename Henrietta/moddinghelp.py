@@ -11,8 +11,8 @@ MENU_CHANNEL_ID = 1528271445799604315
 STICKY_DEBOUNCE_SECONDS = 10
 
 MENU_PANEL = {
-    "title": "Mod Issue Self-Checkout",
-    "description": "Pick an option in the dropdown below to display the debug steps for the issue you are experiencing.\n\nIf following these steps don't fix your issue, please ping <@1538216111005503549> or <#1483328460213719123>, and we'll be able to help!",
+    "title": "<:x_staricon:1523500147085021318> Mod Issue Self-Checkout",
+    "description": "Pick an option in the dropdown below to display the debug steps for the issue you are experiencing.\n\nIf these steps don't fix your issue, please ping <@700767738997768344> or <#1483328460213719123>, and we'll be able to help!",
     "color": "#FFC6D6",
 }
 
