@@ -39,7 +39,7 @@ MENU_OPTIONS = {
         "label": "My game crashed with an error",
         "response": {
             "embed": {
-                "description": "If your game crashed with an error, please post the following details:\n\n  1. A screenshot or copy of what the error was\n  2. When the crash occured (ie. on startup or after taking a specific action)\n  3. A full list of your mods (either a screenshot of your MOMI list or your mods folder)",
+                "description": "If your game crashed with an error, please post the following details:\n\n 1. A screenshot or copy of what the error was\n 2. When the crash occured (ie. on startup or after taking a specific action)\n 3. A full list of your mods (either a screenshot of your MOMI list or your mods folder)",
                 "color": discord.Color.from_str("#FFC6D6"),
             }
         },
@@ -48,7 +48,7 @@ MENU_OPTIONS = {
         "label": "My game crashed silently on startup",
         "response": {
             "embed": {
-                "description": "If your game crashed on startup with no error, please post the following details:\n\n  1.  A full list of your mods (either a screenshot of your MOMI list or your mods folder)\n  2. Your terminal error log. You can get this by following the steps below:\n\n    1. Go to ProgramFile (x86) > Steam > steamapps > common\n    2. Right click on the Fields of Mistria folder and click \"Open in Terminal\"\n    3. In the terminal, type in: \"powershell -noexit -Command \"& ./FieldsOfMistria.exe --debug-tools=true 2>&1 | Write-Host\"; %command%\"",
+                "description": "If your game crashed on startup with no error, please post the following details:\n\n 1.  A full list of your mods (either a screenshot of your MOMI list or your mods folder)\n 2. Your terminal error log.\n\nYou can get your terminal log by following the steps below:\n 1. Go to ProgramFile (x86) > Steam > steamapps > common\n 2. Right click on the Fields of Mistria folder and click \"Open in Terminal\"\n 3. In the terminal, type in: \"powershell -noexit -Command \"& ./FieldsOfMistria.exe --debug-tools=true 2>&1 | Write-Host\"; %command%\"",
                 "color": discord.Color.from_str("#FFC6D6"),
             }
         },
@@ -179,11 +179,15 @@ class MenuSelect(ui.Select):
 
         response = config["response"]
 
+        # Reset the select back to its placeholder so it can be picked again,
+        # then send the actual answer as a separate ephemeral followup.
+        await interaction.response.edit_message(view=MenuView())
+
         if isinstance(response, dict) and "embed" in response:
             embed = discord.Embed(**response["embed"])
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=embed, ephemeral=True)
         else:
-            await interaction.response.send_message(str(response), ephemeral=True)
+            await interaction.followup.send(str(response), ephemeral=True)
 
 
 class MenuView(ui.View):
