@@ -90,7 +90,7 @@ async def _debounced_repost(channel: discord.TextChannel):
 async def _on_message_for_sticky(message: discord.Message):
     if message.channel.id != ART_CHANNEL_ID:
         return
-
+        
     if message.author.id == bot.user.id and message.components:
         return
 
@@ -112,6 +112,14 @@ class ArtModal(ui.Modal, title="Submit Your Art"):
             max_length=1000,
         )
         self.image_upload = ui.FileUpload(required=True, min_values=1, max_values=ART_MAX_IMAGES)
+        self.spoiler_select = ui.Select(
+            options=[
+                discord.SelectOption(label="No — show normally", value="no", default=True),
+                discord.SelectOption(label="Yes — blur/spoiler the images", value="yes"),
+            ],
+            min_values=1,
+            max_values=1,
+        )
 
         self.add_item(ui.Label(text="Description (optional)", component=self.description_input))
         self.add_item(
@@ -120,6 +128,7 @@ class ArtModal(ui.Modal, title="Submit Your Art"):
                 component=self.image_upload,
             )
         )
+        self.add_item(ui.Label(text="Spoiler these images?", component=self.spoiler_select))
 
     async def on_submit(self, interaction: discord.Interaction):
         attachments = self.image_upload.values
@@ -138,34 +147,26 @@ class ArtModal(ui.Modal, title="Submit Your Art"):
         await interaction.response.defer(ephemeral=True, thinking=True)
 
         art_channel = bot.get_channel(ART_CHANNEL_ID) or interaction.channel
-        gallery_url = f"https://art-submission.local/{interaction.id}"
-        files = []
-        embeds = []
 
-        for index, attachment in enumerate(image_attachments):
-            file = await attachment.to_file(filename=f"art_{index}_{attachment.filename}")
-            files.append(file)
+        is_spoiler = bool(self.spoiler_select.values) and self.spoiler_select.values[0] == "yes"
+        files = [
+            await attachment.to_file(filename=f"art_{index}_{attachment.filename}", spoiler=is_spoiler)
+            for index, attachment in enumerate(image_attachments)
+        ]
 
-            if index == 0:
-                embed = discord.Embed(
-                    description=self.description_input.value or None,
-                    color=discord.Color.from_str(ART_PANEL["color"]),
-                    url=gallery_url,
-                )
-                embed.set_author(
-                    name=interaction.user.display_name,
-                    icon_url=interaction.user.display_avatar.url if interaction.user.display_avatar else None,
-                )
-                embed.set_footer(
-                    text=f"{len(image_attachments)} image{'s' if len(image_attachments) != 1 else ''} submitted"
-                )
-            else:
-                embed = discord.Embed(url=gallery_url)
+        embed = discord.Embed(
+            description=self.description_input.value or None,
+            color=discord.Color.from_str(ART_PANEL["color"]),
+        )
+        embed.set_author(
+            name=interaction.user.display_name,
+            icon_url=interaction.user.display_avatar.url if interaction.user.display_avatar else None,
+        )
+        embed.set_footer(
+            text=f"{len(image_attachments)} image{'s' if len(image_attachments) != 1 else ''} submitted"
+        )
 
-            embed.set_image(url=f"attachment://{file.filename}")
-            embeds.append(embed)
-
-        posted_message = await art_channel.send(embeds=embeds, files=files)
+        posted_message = await art_channel.send(embed=embed, files=files)
 
         try:
             thread = await posted_message.create_thread(
