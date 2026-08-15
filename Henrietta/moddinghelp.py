@@ -27,7 +27,7 @@ MENU_OPTIONS = {
         },
     },
     "not-showing": {
-        "label": "Mod is not showing up in game.",
+        "label": "Mods aren't not showing up in game.",
         "response": {
             "embed": {
                 "description": "After a patch, mods need to be uninstalled and reinstalled to work, since the assets folder changed.\n\n*To fix this issue:*\n  1. Uninstall all your mods\n  2. Delete the \"assets.back.zip\" folder from your FoM directory.\n  3. In Steam, go to Properties > Installed files > verify the integrity of your game.\n  3. Reinstall your mods through MOMI.",
@@ -49,6 +49,15 @@ MENU_OPTIONS = {
         "response": {
             "embed": {
                 "description": "If your game crashed on startup with no error, please post the following details:\n\n 1.  A full list of your mods (either a screenshot of your MOMI list or your mods folder)\n 2. Your terminal error log.\n\nYou can get your terminal log by following the steps below:\n 1. Go to ProgramFile (x86) > Steam > steamapps > common\n 2. Right click on the Fields of Mistria folder and click \"Open in Terminal\"\n 3. In the terminal, type in: \"powershell -noexit -Command \"& ./FieldsOfMistria.exe --debug-tools=true 2>&1 | Write-Host\"; %command%\"",
+                "color": discord.Color.from_str("#FFC6D6"),
+            }
+        },
+    },
+    "invalid-save": {
+        "label": "My save is saying it's invalid",
+        "response": {
+            "embed": {
+                "description": "An invalid save is typically casued by a mod that changes your save data that was uninstalled.\n\nKnown mods that cause this issue:\n1. Better Storage (I believe actually any storage mods can cause this)\n2. Better Greenhouses\n\nThis issue can be fixed by installing the latest update of the mod. If you are trying to uninstall them, please load into your save with them installed, remove the greenhouses/chests, then uninstall the mod.",
                 "color": discord.Color.from_str("#FFC6D6"),
             }
         },
