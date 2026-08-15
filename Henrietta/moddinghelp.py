@@ -128,8 +128,6 @@ async def _log_menu_selection(interaction: discord.Interaction, option_key: str,
         color=discord.Color.from_str("#FFC6D6"),
     )
     embed.set_author(name=str(user), icon_url=icon_url)
-    embed.add_field(name="Option", value=f"`{option_key}`")
-    embed.add_field(name="Channel", value=interaction.channel.mention if interaction.channel else "Unknown")
     embed.set_footer(text=f"User ID: {user.id}")
     embed.timestamp = datetime.now(timezone.utc)
 
