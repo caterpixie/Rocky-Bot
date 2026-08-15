@@ -155,7 +155,7 @@ class ArtModal(ui.Modal, title="Submit Your Art"):
         ]
 
         embed = discord.Embed(
-            title=f"{user.mention} posted {len(image_attachments)} image{'s' if len(image_attachments) != 1 else ''}",
+            title=f"{interaction.user.mention} posted {len(image_attachments)} image{'s' if len(image_attachments) != 1 else ''}",
             description=self.description_input.value or None,
             color=discord.Color.from_str(ART_PANEL["color"]),
         )
