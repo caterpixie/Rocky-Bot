@@ -35,7 +35,11 @@ from qotd import (
     register_persistent_views as register_qotd_views,
     auto_post_qotd,
 )
-
+from infomenu import (
+    infomenu_group,
+    set_bot as set_infomenu_bot,
+    InfoMenuView,
+)
 
 # =========================
 # CONFIG
@@ -44,9 +48,8 @@ from qotd import (
 GUILD_ID = 1480390027593777287
 CONFESSION_APPROVAL_CHANNEL = 1482168928045367349
 
-
 # =========================
-# HELPERS
+# BOT
 # =========================
 
 async def restore_pending_confessions(bot: commands.Bot):
@@ -89,17 +92,12 @@ async def restore_pending_confessions(bot: commands.Bot):
             print(f"[RESTORE ERROR] Could not restore view for message {msg_id}: {e}")
 
 
-# =========================
-# BOT
-# =========================
-
 class Client(commands.Bot):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.pool: aiomysql.Pool | None = None
 
     async def setup_hook(self):
-        # MySQL pool
         self.pool = await aiomysql.create_pool(
             host=os.getenv("DB_HOST"),
             port=int(os.getenv("DB_PORT", 3306)),
@@ -109,32 +107,31 @@ class Client(commands.Bot):
             autocommit=True,
         )
 
-        # Module bot hookups
         set_warn_bot(self)
         set_ticket_bot(self)
         set_confessions_bot(self)
         set_uwu_bot(self)
         set_qotd_bot(self)
+        set_infomenu_bot(self)
 
-        # Persistent views
         self.add_view(TicketPanelView())
         self.add_view(CloseTicketView())
         self.add_view(ConfirmCloseView())
         self.add_view(ConfessionInteractionView(self))
+        self.add_view(InfoMenuView())
         register_qotd_views(self)
 
-        # Restore confession approval buttons on restart
         await restore_pending_confessions(self)
-
-        # Slash commands
+        
         self.tree.add_command(mod_group)
         self.tree.add_command(ticket_group)
         self.tree.add_command(confession_group)
         self.tree.add_command(reply_to_confession_context)
         self.tree.add_command(uwu)
         self.tree.add_command(qotd_group)
+        self.tree.add_command(infomenu_group)
 
-        #TEMP
+        #TEMP ONLY IF DUPE COMMANDS
         #self.tree.clear_commands(guild=None)
         #await self.tree.sync()
 
