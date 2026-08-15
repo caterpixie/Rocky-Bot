@@ -25,6 +25,33 @@ MENU_OPTIONS = {
                 "color": discord.Color.from_str("#FFC6D6"),
             }
         },
+    },
+    "not-showing": {
+        "label": "Mod is not showing up in game.",
+        "response": {
+            "embed": {
+                "description": "After a patch, mods need to be uninstalled and reinstalled to work, since the assets folder changed.\n\n*To fix this issue:*\n  1. Uninstall all your mods\n  2. Delete the \"assets.back.zip\" folder from your FoM directory.\n  3. In Steam, go to Properties > Installed files > verify the integrity of your game.\n  3. Reinstall your mods through MOMI.",
+                "color": discord.Color.from_str("#FFC6D6"),
+            }
+        },
+    },
+    "crash-with-error": {
+        "label": "My game crashed with an error",
+        "response": {
+            "embed": {
+                "description": "If your game crashed with an error, please post the following details:\n\n  1. A screenshot or copy of what the error was\n  2. When the crash occured (ie. on startup or after taking a specific action)\n  3. A full list of your mods (either a screenshot of your MOMI list or your mods folder)",
+                "color": discord.Color.from_str("#FFC6D6"),
+            }
+        },
+    },
+    "crash-with-no-error": {
+        "label": "My game crashed silently on startup",
+        "response": {
+            "embed": {
+                "description": "If your game crashed on startup with no error, please post the following details:\n\n  1.  A full list of your mods (either a screenshot of your MOMI list or your mods folder)\n  2. Your terminal error log. You can get this by following the steps below:\n\n    1. Go to ProgramFile (x86) > Steam > steamapps > common\n    2. Right click on the Fields of Mistria folder and click \"Open in Terminal\"\n    3. In the terminal, type in: \"powershell -noexit -Command \"& ./FieldsOfMistria.exe --debug-tools=true 2>&1 | Write-Host\"; %command%\"",
+                "color": discord.Color.from_str("#FFC6D6"),
+            }
+        },
     }
 }
 
