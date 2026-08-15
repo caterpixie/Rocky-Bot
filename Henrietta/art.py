@@ -194,7 +194,6 @@ class ArtSubmitButton(ui.Button):
         super().__init__(
             label="Submit Art",
             style=discord.ButtonStyle.secondary,
-            emoji="🎨",
             custom_id="art:submit",
         )
 
