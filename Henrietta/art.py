@@ -114,8 +114,8 @@ class ArtModal(ui.Modal, title="Submit Your Art"):
         self.image_upload = ui.FileUpload(required=True, min_values=1, max_values=ART_MAX_IMAGES)
         self.spoiler_select = ui.Select(
             options=[
-                discord.SelectOption(label="No — show normally", value="no", default=True),
-                discord.SelectOption(label="Yes — blur/spoiler the images", value="yes"),
+                discord.SelectOption(label="No these are SFW", value="no", default=True),
+                discord.SelectOption(label="Yes! One of these pictures has dick and/or ball", value="yes"),
             ],
             min_values=1,
             max_values=1,
@@ -155,6 +155,7 @@ class ArtModal(ui.Modal, title="Submit Your Art"):
         ]
 
         embed = discord.Embed(
+            title=f"{user.mention} posted {len(image_attachments)} image{'s' if len(image_attachments) != 1 else ''}"
             description=self.description_input.value or None,
             color=discord.Color.from_str(ART_PANEL["color"]),
         )
@@ -162,10 +163,6 @@ class ArtModal(ui.Modal, title="Submit Your Art"):
             name=interaction.user.display_name,
             icon_url=interaction.user.display_avatar.url if interaction.user.display_avatar else None,
         )
-        embed.set_footer(
-            text=f"{len(image_attachments)} image{'s' if len(image_attachments) != 1 else ''} submitted"
-        )
-
         posted_message = await art_channel.send(embed=embed, files=files)
 
         try:
