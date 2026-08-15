@@ -91,11 +91,6 @@ async def _on_message_for_sticky(message: discord.Message):
     if message.channel.id != ART_CHANNEL_ID:
         return
 
-    # Ignore only the sticky panel's own repost, identified by it being a
-    # bot message carrying the "Submit Art" button component (art
-    # submission posts never have a view attached to them). This avoids
-    # an infinite repost loop without relying on any state that could race
-    # against the gateway delivering our own message back to us.
     if message.author.id == bot.user.id and message.components:
         return
 
