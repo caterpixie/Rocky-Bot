@@ -155,12 +155,11 @@ class ArtModal(ui.Modal, title="Submit Your Art"):
         ]
 
         embed = discord.Embed(
-            title=f"{interaction.user.mention} posted {len(image_attachments)} image{'s' if len(image_attachments) != 1 else ''}",
             description=self.description_input.value or None,
             color=discord.Color.from_str(ART_PANEL["color"]),
         )
         embed.set_author(
-            name=interaction.user.display_name,
+            name=f"Posted by {interaction.user.display_name}",
             icon_url=interaction.user.display_avatar.url if interaction.user.display_avatar else None,
         )
         posted_message = await art_channel.send(embed=embed, files=files)
