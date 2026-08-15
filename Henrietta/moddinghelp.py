@@ -2,6 +2,7 @@ import asyncio
 import discord
 from discord import app_commands, ui
 import aiomysql
+from datetime import datetime, timezone
 
 # ============================================================
 # CONFIGURATION
@@ -9,6 +10,7 @@ import aiomysql
 
 MENU_CHANNEL_ID = 1528271445799604315
 STICKY_DEBOUNCE_SECONDS = 10
+MODHELP_LOG_CHANNEL_ID = 1486952344796270693
 
 MENU_PANEL = {
     "title": "<:x_staricon:1523500147085021318> Mod Issue Self-Checkout",
@@ -109,6 +111,34 @@ async def _clear_sticky_message_id(channel_id: int):
 _pending_repost_tasks: dict[int, asyncio.Task] = {}
 
 
+async def _log_menu_selection(interaction: discord.Interaction, option_key: str, option_label: str):
+    if not MODHELP_LOG_CHANNEL_ID:
+        return
+
+    channel = bot.get_channel(MODHELP_LOG_CHANNEL_ID)
+    if channel is None:
+        return
+
+    user = interaction.user
+    icon_url = user.display_avatar.url if user.display_avatar else None
+
+    embed = discord.Embed(
+        title="Mod Help Menu Used",
+        description=f"{user.mention} selected **{option_label}**",
+        color=discord.Color.from_str("#FFC6D6"),
+    )
+    embed.set_author(name=str(user), icon_url=icon_url)
+    embed.add_field(name="Option", value=f"`{option_key}`")
+    embed.add_field(name="Channel", value=interaction.channel.mention if interaction.channel else "Unknown")
+    embed.set_footer(text=f"User ID: {user.id}")
+    embed.timestamp = datetime.now(timezone.utc)
+
+    try:
+        await channel.send(embed=embed)
+    except (discord.Forbidden, discord.HTTPException):
+        pass
+
+
 def _build_MENU_embed() -> discord.Embed:
     return discord.Embed(
         title=MENU_PANEL["title"],
@@ -187,9 +217,7 @@ class MenuSelect(ui.Select):
             return
 
         response = config["response"]
-
-        # Reset the select back to its placeholder so it can be picked again,
-        # then send the actual answer as a separate ephemeral followup.
+        await _log_menu_selection(interaction, choice, config["label"])
         await interaction.response.edit_message(view=MenuView())
 
         if isinstance(response, dict) and "embed" in response:
