@@ -13,7 +13,7 @@ STICKY_DEBOUNCE_SECONDS = 3
 
 ART_PANEL = {
     "title": "<:x_staricon:1523500147085021318> Share Your Art",
-    "description": "Click the button below to submit your art! You'll be asked for a title, an optional description, and up to {max_images} images.\n\nOnce submitted, it'll be posted here with its own thread to keep discussions to their own post only.",
+    "description": "Click the button below to submit your art! You can post up to 10 images at once along with a descripton.\n\nOnce submitted, it'll be posted here with its own thread to keep discussions to their own post only.",
     "color": "#FFC6D6",
 }
 
@@ -106,12 +106,6 @@ async def _on_message_for_sticky(message: discord.Message):
 class ArtModal(ui.Modal, title="Submit Your Art"):
     def __init__(self):
         super().__init__()
-
-        self.title_input = ui.TextInput(
-            placeholder="Title for your post",
-            required=True,
-            max_length=100,
-        )
         self.description_input = ui.TextInput(
             style=discord.TextStyle.paragraph,
             placeholder="Anything you want the masses to know",
@@ -120,7 +114,6 @@ class ArtModal(ui.Modal, title="Submit Your Art"):
         )
         self.image_upload = ui.FileUpload(required=True, min_values=1, max_values=ART_MAX_IMAGES)
 
-        self.add_item(ui.Label(text="Title", component=self.title_input))
         self.add_item(ui.Label(text="Description (optional)", component=self.description_input))
         self.add_item(
             ui.Label(
@@ -156,7 +149,6 @@ class ArtModal(ui.Modal, title="Submit Your Art"):
 
             if index == 0:
                 embed = discord.Embed(
-                    title=self.title_input.value,
                     description=self.description_input.value or None,
                     color=discord.Color.from_str(ART_PANEL["color"]),
                     url=gallery_url,
@@ -177,7 +169,7 @@ class ArtModal(ui.Modal, title="Submit Your Art"):
 
         try:
             thread = await posted_message.create_thread(
-                name=self.title_input.value[:100],
+                name="Discussion",
                 auto_archive_duration=THREAD_AUTO_ARCHIVE_MINUTES,
             )
         except (discord.Forbidden, discord.HTTPException):
