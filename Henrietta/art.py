@@ -9,17 +9,16 @@ from datetime import datetime, timezone
 # ============================================================
 
 ART_CHANNEL_ID = 1483327961141739571
-STICKY_DEBOUNCE_SECONDS = 2
+STICKY_DEBOUNCE_SECONDS = 3
 
 ART_PANEL = {
-    "title": "<:x_staricon:1523500147085021318> Share Your Art!",
-    "description": "Click the button below to submit your art! You can add up to {max_images} images as well as some text/a description.\n\nOnce submitted, it'll be posted here with its own thread to keep discussions contained to their own post.",
+    "title": "<:x_staricon:1523500147085021318> Share Your Art",
+    "description": "Click the button below to submit your art! You'll be asked for a title, an optional description, and up to {max_images} images, all in one form.\n\nOnce submitted, it'll be posted here with its own thread to keep discussions to their own post only.",
     "color": "#FFC6D6",
 }
 
 ART_MAX_IMAGES = 10
-
-THREAD_AUTO_ARCHIVE_MINUTES = 1440
+THREAD_AUTO_ARCHIVE_MINUTES = 1440 
 
 # ============================================================
 # BOT HOOKUP
@@ -54,7 +53,6 @@ async def _set_sticky_message_id(channel_id: int, message_id: int):
                 """,
                 (channel_id, message_id),
             )
-
 
 _pending_repost_tasks: dict[int, asyncio.Task] = {}
 
@@ -108,6 +106,12 @@ async def _on_message_for_sticky(message: discord.Message):
 class ArtModal(ui.Modal, title="Submit Your Art"):
     def __init__(self):
         super().__init__()
+
+        self.title_input = ui.TextInput(
+            placeholder="Title for your post",
+            required=True,
+            max_length=100,
+        )
         self.description_input = ui.TextInput(
             style=discord.TextStyle.paragraph,
             placeholder="Anything you want the masses to know",
@@ -115,6 +119,8 @@ class ArtModal(ui.Modal, title="Submit Your Art"):
             max_length=1000,
         )
         self.image_upload = ui.FileUpload(required=True, min_values=1, max_values=ART_MAX_IMAGES)
+
+        self.add_item(ui.Label(text="Title", component=self.title_input))
         self.add_item(ui.Label(text="Description (optional)", component=self.description_input))
         self.add_item(
             ui.Label(
@@ -140,7 +146,6 @@ class ArtModal(ui.Modal, title="Submit Your Art"):
         await interaction.response.defer(ephemeral=True, thinking=True)
 
         art_channel = bot.get_channel(ART_CHANNEL_ID) or interaction.channel
-
         gallery_url = f"https://art-submission.local/{interaction.id}"
         files = []
         embeds = []
@@ -189,6 +194,7 @@ class ArtSubmitButton(ui.Button):
         super().__init__(
             label="Submit Art",
             style=discord.ButtonStyle.secondary,
+            emoji="🎨",
             custom_id="art:submit",
         )
 
