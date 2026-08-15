@@ -21,7 +21,7 @@ MENU_OPTIONS = {
         "label": "Game GML changed. Unable to install.",
         "response": {
             "embed": {
-                "description": "This is a MOMI security feature, not a bug with the mod. Every time the game is patched and a GML seam is changed, MOMI will skip the installation of GML mods until MOMI can be updated.\n\n*To fix this issue:*\n  1. Download the latest version of MOMI that was updated AFTER the latest game patch.\n  2. Move your mods folder to another location (ex. your desktop) to not lose your mods\n  3. Go to ProgramFile (x86) > Steam > steamapps > common and delete the Fields of Mistria folder (this won't delete your save files, they're in a different location)\n  4. Reinstall the game through Steam",
+                "description": "This is a MOMI security feature, **not a bug with your mod**. Every time the game is patched and a GML seam is changed, MOMI will skip the installation of GML mods until MOMI can be updated.\n\n*To fix this issue:*\n  1. Download the latest version of MOMI that was updated AFTER the latest game patch.\n  2. Move your mods folder to another location (ex. your desktop) to not lose your mods\n  3. Go to ProgramFile (x86) > Steam > steamapps > common and delete the Fields of Mistria folder (this won't delete your save files, they're in a different location)\n  4. Reinstall the game through Steam",
                 "color": discord.Color.from_str("#FFC6D6"),
             }
         },
