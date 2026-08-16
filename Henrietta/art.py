@@ -15,18 +15,18 @@ WRITING_MAX_FILES = 1
 WRITING_MAX_TEXT_LENGTH = 4000
 
 WRITING_COLORS = {
-    "own": "#FFC6D6",    
+    "own": "#FFC6D6",  
     "share": "#CC718A",  
 }
 
 WRITING_PANEL = {
-    "title": "<:x_staricon:1523500147085021318> Share Some Writing/Fics!",
-    "description": "Click the button below to submit writing! You can paste raw text, drop a link, or attach a file.\n\nYou can either post your own stuff, or a fic you wanna share with the class.",
+    "title": "<:x_staricon:1523500147085021318> Share Your Writing",
+    "description": "Click the button below to submit writing! You can paste raw text, drop a link, or attach a file.\n\nYou can post your own writing here or just something you wanna share with the class.",
     "color": "#FFC6D6",
 }
 
 ART_PANEL = {
-    "title": "<:x_staricon:1523500147085021318> Share Your Art!",
+    "title": "<:x_staricon:1523500147085021318> Share Your Art",
     "description": "Click the button below to submit your art! You can post up to 10 images at once along with a descripton.\n\nOnce submitted, it'll be posted here with its own thread to keep discussions to their own post only.",
     "color": "#FFC6D6",
 }
@@ -87,7 +87,6 @@ def _build_writing_panel_embed() -> discord.Embed:
     )
 
 _STICKY_PANELS: dict[int, tuple] = {}
-
 
 async def _repost_sticky(channel: discord.TextChannel):
     panel = _STICKY_PANELS.get(channel.id)
@@ -216,10 +215,12 @@ async def send_writing_embed(
     author: discord.abc.User,
     channel: discord.abc.Messageable,
     *,
+    title: str | None = None,
     text: str | None = None,
     attachments: list[discord.Attachment] | None = None,
     origin: str = "own",
 ) -> discord.Message:
+    title = (title or "").strip()
     text = (text or "").strip()
     attachments = attachments or []
 
@@ -227,7 +228,10 @@ async def send_writing_embed(
         raise ValueError("send_writing_embed requires text and/or attachments")
 
     color_hex = WRITING_COLORS.get(origin, WRITING_COLORS["own"])
-    embed = discord.Embed(color=discord.Color.from_str(color_hex))
+    embed = discord.Embed(
+        title=title[:256] or None,
+        color=discord.Color.from_str(color_hex),
+    )
     embed.set_author(
         name=f"Posted by {author.display_name}",
         icon_url=author.display_avatar.url if author.display_avatar else None,
@@ -250,6 +254,12 @@ async def send_writing_embed(
 class WritingModal(ui.Modal, title="Submit Your Writing"):
     def __init__(self):
         super().__init__()
+        self.title_input = ui.TextInput(
+            style=discord.TextStyle.short,
+            placeholder="Give it a title (optional)",
+            required=False,
+            max_length=256,
+        )
         self.text_input = ui.TextInput(
             style=discord.TextStyle.paragraph,
             placeholder="Paste your writing, or a link to it (leave blank if attaching a file)",
@@ -266,6 +276,7 @@ class WritingModal(ui.Modal, title="Submit Your Writing"):
             max_values=1,
         )
 
+        self.add_item(ui.Label(text="Title (optional)", component=self.title_input))
         self.add_item(ui.Label(text="Text or Link (optional)", component=self.text_input))
         self.add_item(
             ui.Label(
@@ -276,6 +287,7 @@ class WritingModal(ui.Modal, title="Submit Your Writing"):
         self.add_item(ui.Label(text="What is this?", component=self.origin_select))
 
     async def on_submit(self, interaction: discord.Interaction):
+        title_value = self.title_input.value or ""
         text_value = self.text_input.value or ""
         attachments = self.file_upload.values
 
@@ -295,6 +307,7 @@ class WritingModal(ui.Modal, title="Submit Your Writing"):
         posted_message = await send_writing_embed(
             interaction.user,
             writing_channel,
+            title=title_value,
             text=text_value,
             attachments=attachments,
             origin=origin,
