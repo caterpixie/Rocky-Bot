@@ -10,8 +10,23 @@ import aiomysql
 ART_CHANNEL_ID = 1483327961141739571
 STICKY_DEBOUNCE_SECONDS = 3
 
+WRITING_CHANNEL_ID = 1538412707471040574
+WRITING_MAX_FILES = 1
+WRITING_MAX_TEXT_LENGTH = 4000
+
+WRITING_COLORS = {
+    "own": "#FFC6D6",    
+    "share": "#CC718A",  
+}
+
+WRITING_PANEL = {
+    "title": "<:x_staricon:1523500147085021318> Share Some Writing/Fics!",
+    "description": "Click the button below to submit writing! You can paste raw text, drop a link, or attach a file.\n\nYou can either post your own stuff, or a fic you wanna share with the class.",
+    "color": "#FFC6D6",
+}
+
 ART_PANEL = {
-    "title": "<:x_staricon:1523500147085021318> Share Your Art",
+    "title": "<:x_staricon:1523500147085021318> Share Your Art!",
     "description": "Click the button below to submit your art! You can post up to 10 images at once along with a descripton.\n\nOnce submitted, it'll be posted here with its own thread to keep discussions to their own post only.",
     "color": "#FFC6D6",
 }
@@ -64,7 +79,25 @@ def _build_art_panel_embed() -> discord.Embed:
     )
 
 
+def _build_writing_panel_embed() -> discord.Embed:
+    return discord.Embed(
+        title=WRITING_PANEL["title"],
+        description=WRITING_PANEL["description"],
+        color=discord.Color.from_str(WRITING_PANEL["color"]),
+    )
+
+
+# Maps a sticky-panel channel ID to the (embed builder, view factory) used to repost it.
+# Populated after the view classes are defined below (see bottom of file).
+_STICKY_PANELS: dict[int, tuple] = {}
+
+
 async def _repost_sticky(channel: discord.TextChannel):
+    panel = _STICKY_PANELS.get(channel.id)
+    if not panel:
+        return
+    embed_builder, view_factory = panel
+
     old_message_id = await _get_sticky_message_id(channel.id)
     if old_message_id:
         try:
@@ -73,7 +106,7 @@ async def _repost_sticky(channel: discord.TextChannel):
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             pass
 
-    new_message = await channel.send(embed=_build_art_panel_embed(), view=ArtPanelView())
+    new_message = await channel.send(embed=embed_builder(), view=view_factory())
     await _set_sticky_message_id(channel.id, new_message.id)
 
 
@@ -88,7 +121,7 @@ async def _debounced_repost(channel: discord.TextChannel):
 
 
 async def _on_message_for_sticky(message: discord.Message):
-    if message.channel.id != ART_CHANNEL_ID:
+    if message.channel.id not in _STICKY_PANELS:
         return
         
     if message.author.id == bot.user.id and message.components:
@@ -178,6 +211,123 @@ class ArtModal(ui.Modal, title="Submit Your Art"):
         )
 
 
+def _looks_like_url(text: str) -> bool:
+    return text.startswith("http://") or text.startswith("https://")
+
+
+async def send_writing_embed(
+    author: discord.abc.User,
+    channel: discord.abc.Messageable,
+    *,
+    text: str | None = None,
+    attachments: list[discord.Attachment] | None = None,
+    origin: str = "own",
+) -> discord.Message:
+  ), and controls the embed color per WRITING_COLORS.
+    text = (text or "").strip()
+    attachments = attachments or []
+
+    if not text and not attachments:
+        raise ValueError("send_writing_embed requires text and/or attachments")
+
+    color_hex = WRITING_COLORS.get(origin, WRITING_COLORS["own"])
+    embed = discord.Embed(color=discord.Color.from_str(color_hex))
+    embed.set_author(
+        name=f"Posted by {author.display_name}",
+        icon_url=author.display_avatar.url if author.display_avatar else None,
+    )
+
+    if text:
+        if _looks_like_url(text):
+            embed.add_field(name="Link", value=text, inline=False)
+        else:
+            embed.description = text[:4096]
+
+    files = [
+        await attachment.to_file(filename=f"writing_{index}_{attachment.filename}")
+        for index, attachment in enumerate(attachments)
+    ]
+
+    return await channel.send(embed=embed, files=files or discord.utils.MISSING)
+
+
+class WritingModal(ui.Modal, title="Submit Your Writing"):
+    def __init__(self):
+        super().__init__()
+        self.text_input = ui.TextInput(
+            style=discord.TextStyle.paragraph,
+            placeholder="Paste your writing, or a link to it (leave blank if attaching a file)",
+            required=False,
+            max_length=WRITING_MAX_TEXT_LENGTH,
+        )
+        self.file_upload = ui.FileUpload(required=False, min_values=0, max_values=WRITING_MAX_FILES)
+        self.origin_select = ui.Select(
+            options=[
+                discord.SelectOption(label="This is my own writing", value="own", default=True),
+                discord.SelectOption(label="I'm just sharing something", value="share"),
+            ],
+            min_values=1,
+            max_values=1,
+        )
+
+        self.add_item(ui.Label(text="Text or Link (optional)", component=self.text_input))
+        self.add_item(
+            ui.Label(
+                text=f"File{'s' if WRITING_MAX_FILES > 1 else ''} (optional)",
+                component=self.file_upload,
+            )
+        )
+        self.add_item(ui.Label(text="What is this?", component=self.origin_select))
+
+    async def on_submit(self, interaction: discord.Interaction):
+        text_value = self.text_input.value or ""
+        attachments = self.file_upload.values
+
+        if not text_value.strip() and not attachments:
+            await interaction.response.send_message(
+                "You need to provide either text, a link, or a file. Click **Submit Writing** again to retry.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+        writing_channel = bot.get_channel(WRITING_CHANNEL_ID) or interaction.channel
+
+        origin = self.origin_select.values[0] if self.origin_select.values else "own"
+
+        posted_message = await send_writing_embed(
+            interaction.user,
+            writing_channel,
+            text=text_value,
+            attachments=attachments,
+            origin=origin,
+        )
+
+        await interaction.followup.send(
+            f"Your writing has been posted! {posted_message.jump_url}",
+            ephemeral=True,
+        )
+
+
+class WritingSubmitButton(ui.Button):
+    def __init__(self):
+        super().__init__(
+            label="Submit Writing",
+            style=discord.ButtonStyle.secondary,
+            custom_id="writing:submit",
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(WritingModal())
+
+
+class WritingPanelView(ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(WritingSubmitButton())
+
+
 class ArtSubmitButton(ui.Button):
     def __init__(self):
         super().__init__(
@@ -202,6 +352,9 @@ class ArtGroup(app_commands.Group):
 
 art_group = ArtGroup()
 
+_STICKY_PANELS[ART_CHANNEL_ID] = (_build_art_panel_embed, ArtPanelView)
+_STICKY_PANELS[WRITING_CHANNEL_ID] = (_build_writing_panel_embed, WritingPanelView)
+
 
 @art_group.command(name="setup", description="Posts the sticky art submission panel to the configured channel")
 async def art_setup(interaction: discord.Interaction):
@@ -210,15 +363,21 @@ async def art_setup(interaction: discord.Interaction):
         await interaction.response.send_message("Error: art channel not found.", ephemeral=True)
         return
 
-    old_message_id = await _get_sticky_message_id(channel.id)
-    if old_message_id:
-        try:
-            old_message = await channel.fetch_message(old_message_id)
-            await old_message.delete()
-        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-            pass
-
-    new_message = await channel.send(embed=_build_art_panel_embed(), view=ArtPanelView())
-    await _set_sticky_message_id(channel.id, new_message.id)
-
+    await _repost_sticky(channel)
     await interaction.response.send_message("Art panel sent!", ephemeral=True)
+
+
+@art_group.command(name="setup-writing", description="Posts the sticky writing submission panel to the configured channel")
+async def art_setup_writing(interaction: discord.Interaction):
+    channel = interaction.guild.get_channel(WRITING_CHANNEL_ID)
+    if not channel:
+        await interaction.response.send_message("Error: writing channel not found.", ephemeral=True)
+        return
+
+    await _repost_sticky(channel)
+    await interaction.response.send_message("Writing panel sent!", ephemeral=True)
+
+
+@art_group.command(name="share-writing", description="Submit writing (link, text, or file) to the writing channel")
+async def art_share_writing(interaction: discord.Interaction):
+    await interaction.response.send_modal(WritingModal())
