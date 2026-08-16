@@ -396,8 +396,15 @@ async def art_setup(interaction: discord.Interaction):
         await interaction.response.send_message("Error: art channel not found.", ephemeral=True)
         return
 
-    await _repost_sticky(channel)
-    await interaction.response.send_message("Art panel sent!", ephemeral=True)
+    await interaction.response.defer(ephemeral=True, thinking=True)
+
+    try:
+        await _repost_sticky(channel)
+    except Exception:
+        await interaction.followup.send("Something went wrong posting the art panel.", ephemeral=True)
+        raise
+
+    await interaction.followup.send("Art panel sent!", ephemeral=True)
 
 
 @art_group.command(name="setup-writing", description="Posts the sticky writing submission panel to the configured channel")
@@ -407,8 +414,15 @@ async def art_setup_writing(interaction: discord.Interaction):
         await interaction.response.send_message("Error: writing channel not found.", ephemeral=True)
         return
 
-    await _repost_sticky(channel)
-    await interaction.response.send_message("Writing panel sent!", ephemeral=True)
+    await interaction.response.defer(ephemeral=True, thinking=True)
+
+    try:
+        await _repost_sticky(channel)
+    except Exception:
+        await interaction.followup.send("Something went wrong posting the writing panel.", ephemeral=True)
+        raise
+
+    await interaction.followup.send("Writing panel sent!", ephemeral=True)
 
 
 @art_group.command(name="share-writing", description="Submit writing (link, text, or file) to the writing channel")
