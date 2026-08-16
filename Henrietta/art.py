@@ -13,6 +13,7 @@ STICKY_DEBOUNCE_SECONDS = 3
 WRITING_CHANNEL_ID = 1538412707471040574
 WRITING_MAX_FILES = 1
 WRITING_MAX_TEXT_LENGTH = 4000
+WRITING_MAX_SUMMARY_LENGTH = 200
 
 WRITING_COLORS = {
     "own": "#FFC6D6",  
@@ -21,7 +22,7 @@ WRITING_COLORS = {
 
 WRITING_PANEL = {
     "title": "<:x_staricon:1523500147085021318> Share Your Writing",
-    "description": "Click the button below to submit writing! You can paste raw text, drop a link, or attach a file.\n\nYou can post your own writing or just stuff you want to share with the class",
+    "description": "Click the button below to submit writing! You can paste raw text, drop a link, or attach a file.\n\nYou can post your owwn writing or just stuff you want to share with the class",
     "color": "#FFC6D6",
 }
 
@@ -216,12 +217,14 @@ async def send_writing_embed(
     channel: discord.abc.Messageable,
     *,
     title: str | None = None,
+    summary: str | None = None,
     text: str | None = None,
     attachments: list[discord.Attachment] | None = None,
     origin: str = "own",
 ) -> discord.Message:
 
     title = (title or "").strip()
+    summary = (summary or "").strip()
     text = (text or "").strip()
     attachments = attachments or []
 
@@ -237,6 +240,9 @@ async def send_writing_embed(
         name=f"Posted by {author.display_name}",
         icon_url=author.display_avatar.url if author.display_avatar else None,
     )
+
+    if summary:
+        embed.add_field(name="Summary", value=summary[:1024], inline=False)
 
     if text:
         if _looks_like_url(text):
@@ -261,6 +267,12 @@ class WritingModal(ui.Modal, title="Submit Your Writing"):
             required=False,
             max_length=256,
         )
+        self.summary_input = ui.TextInput(
+            style=discord.TextStyle.short,
+            placeholder="A one-line summary or TL;DR (optional)",
+            required=False,
+            max_length=WRITING_MAX_SUMMARY_LENGTH,
+        )
         self.text_input = ui.TextInput(
             style=discord.TextStyle.paragraph,
             placeholder="Paste your writing, or a link to it (leave blank if attaching a file)",
@@ -278,6 +290,7 @@ class WritingModal(ui.Modal, title="Submit Your Writing"):
         )
 
         self.add_item(ui.Label(text="Title (optional)", component=self.title_input))
+        self.add_item(ui.Label(text="Summary (optional)", component=self.summary_input))
         self.add_item(ui.Label(text="Text or Link (optional)", component=self.text_input))
         self.add_item(
             ui.Label(
@@ -289,6 +302,7 @@ class WritingModal(ui.Modal, title="Submit Your Writing"):
 
     async def on_submit(self, interaction: discord.Interaction):
         title_value = self.title_input.value or ""
+        summary_value = self.summary_input.value or ""
         text_value = self.text_input.value or ""
         attachments = self.file_upload.values
 
@@ -309,6 +323,7 @@ class WritingModal(ui.Modal, title="Submit Your Writing"):
             interaction.user,
             writing_channel,
             title=title_value,
+            summary=summary_value,
             text=text_value,
             attachments=attachments,
             origin=origin,
