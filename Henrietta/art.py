@@ -16,12 +16,12 @@ WRITING_MAX_TEXT_LENGTH = 4000
 
 WRITING_COLORS = {
     "own": "#FFC6D6",  
-    "share": "#CC718A",  
+    "share": "#CC718A", 
 }
 
 WRITING_PANEL = {
     "title": "<:x_staricon:1523500147085021318> Share Your Writing",
-    "description": "Click the button below to submit writing! You can paste raw text, drop a link, or attach a file.\n\nYou can post your own writing here or just something you wanna share with the class.",
+    "description": "Click the button below to submit writing! You can paste raw text, drop a link, or attach a file.\n\nYou can post your owwn writing or just stuff you want to share with the class",
     "color": "#FFC6D6",
 }
 
@@ -85,7 +85,7 @@ def _build_writing_panel_embed() -> discord.Embed:
         description=WRITING_PANEL["description"],
         color=discord.Color.from_str(WRITING_PANEL["color"]),
     )
-
+    
 _STICKY_PANELS: dict[int, tuple] = {}
 
 async def _repost_sticky(channel: discord.TextChannel):
@@ -220,6 +220,7 @@ async def send_writing_embed(
     attachments: list[discord.Attachment] | None = None,
     origin: str = "own",
 ) -> discord.Message:
+
     title = (title or "").strip()
     text = (text or "").strip()
     attachments = attachments or []
@@ -312,6 +313,14 @@ class WritingModal(ui.Modal, title="Submit Your Writing"):
             attachments=attachments,
             origin=origin,
         )
+
+        try:
+            await posted_message.create_thread(
+                name="Discussion",
+                auto_archive_duration=THREAD_AUTO_ARCHIVE_MINUTES,
+            )
+        except (discord.Forbidden, discord.HTTPException):
+            pass
 
         await interaction.followup.send(
             f"Your writing has been posted! {posted_message.jump_url}",
