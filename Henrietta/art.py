@@ -21,7 +21,7 @@ WRITING_COLORS = {
 
 WRITING_PANEL = {
     "title": "<:x_staricon:1523500147085021318> Share Your Writing",
-    "description": "Click the button below to submit writing! You can paste raw text, drop a link, or attach a file.\n\nYou can post your owwn writing or just stuff you want to share with the class",
+    "description": "Click the button below to submit writing! You can paste raw text, drop a link, or attach a file.\n\nYou can post your own writing or just stuff you want to share with the class",
     "color": "#FFC6D6",
 }
 
