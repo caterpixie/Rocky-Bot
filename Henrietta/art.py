@@ -86,9 +86,6 @@ def _build_writing_panel_embed() -> discord.Embed:
         color=discord.Color.from_str(WRITING_PANEL["color"]),
     )
 
-
-# Maps a sticky-panel channel ID to the (embed builder, view factory) used to repost it.
-# Populated after the view classes are defined below (see bottom of file).
 _STICKY_PANELS: dict[int, tuple] = {}
 
 
