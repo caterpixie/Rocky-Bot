@@ -223,7 +223,6 @@ async def send_writing_embed(
     attachments: list[discord.Attachment] | None = None,
     origin: str = "own",
 ) -> discord.Message:
-  ), and controls the embed color per WRITING_COLORS.
     text = (text or "").strip()
     attachments = attachments or []
 
