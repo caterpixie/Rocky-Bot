@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 # ============================================================
 
 MENU_CHANNEL_ID = 1528271445799604315
-STICKY_DEBOUNCE_SECONDS = 10
+STICKY_DEBOUNCE_SECONDS = 60
 MODHELP_LOG_CHANNEL_ID = 1487175733884354650
 
 MENU_PANEL = {
