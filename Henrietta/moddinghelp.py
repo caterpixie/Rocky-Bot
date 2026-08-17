@@ -63,6 +63,15 @@ MENU_OPTIONS = {
                 "color": discord.Color.from_str("#FFC6D6"),
             }
         },
+    },
+    "missing-mist": {
+        "label": "Getting the error: Missing mist data",
+        "response": {
+            "embed": {
+                "description": "Heyyy~ So as of right now, I have no idea what is causing this error, sorry to be the bearer of bad news.\n\nIf you can, I would really appreciate you helping me figure it out by providing the following info in a ticket:\n1. What version are you using (the normal version or the one with Sweaty Portraits)\n2. Does it mysteriously start working if you start using the other version?\n3. What OS are you on (Linux, MacOS, Windows 10/11)>\n4. What version of MOMI are you using?\n\nAnd literally any other info that may or may not be useful <3",
+                "color": discord.Color.from_str("#FFC6D6"),
+            }
+        },
     }
 }
 
