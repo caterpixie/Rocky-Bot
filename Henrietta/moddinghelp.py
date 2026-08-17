@@ -55,20 +55,20 @@ MENU_OPTIONS = {
             }
         },
     },
-    "invalid-save": {
-        "label": "My save is saying it's invalid",
-        "response": {
-            "embed": {
-                "description": "An invalid save is typically casued by a mod that changes your save data that was uninstalled.\n\nKnown mods that cause this issue:\n1. Better Storage (I believe actually any storage mods can cause this)\n2. Better Greenhouses\n\nThis issue can be fixed by installing the latest update of the mod. If you are trying to uninstall them, please load into your save with them installed, remove the greenhouses/chests, then uninstall the mod.",
-                "color": discord.Color.from_str("#FFC6D6"),
-            }
-        },
-    },
     "missing-mist": {
         "label": "Getting the error: Missing mist data",
         "response": {
             "embed": {
                 "description": "Heyyy~ So as of right now, I have no idea what is causing this error, sorry to be the bearer of bad news.\n\nIf you can, I would really appreciate you helping me figure it out by providing the following info in a ticket:\n1. What version are you using (the normal version or the one with Sweaty Portraits)\n2. Does it mysteriously start working if you start using the other version?\n3. What OS are you on (Linux, MacOS, Windows 10/11)>\n4. What version of MOMI are you using?\n\nAnd literally any other info that may or may not be useful <3",
+                "color": discord.Color.from_str("#FFC6D6"),
+            }
+        },
+    },
+    "invalid-save": {
+        "label": "My save is saying it's invalid",
+        "response": {
+            "embed": {
+                "description": "An invalid save is typically casued by a mod that changes your save data that was uninstalled.\n\nKnown mods that cause this issue:\n1. Better Storage (I believe actually any storage mods can cause this)\n2. Better Greenhouses\n\nThis issue can be fixed by installing the latest update of the mod. If you are trying to uninstall them, please load into your save with them installed, remove the greenhouses/chests, then uninstall the mod.",
                 "color": discord.Color.from_str("#FFC6D6"),
             }
         },
