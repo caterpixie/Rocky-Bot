@@ -45,6 +45,10 @@ from art import (
     set_bot as set_art_bot,
     ArtPanelView,
 )
+from aicheck import (                  
+    ai_group,                             
+    set_bot as set_aicheck_bot,          
+)                                           
 
 # =========================
 # CONFIG
@@ -119,6 +123,7 @@ class Client(commands.Bot):
         set_qotd_bot(self)
         set_modhelp_bot(self)
         set_art_bot(self)
+        set_aicheck_bot(self)          
 
         self.add_view(TicketPanelView())
         self.add_view(CloseTicketView())
@@ -138,6 +143,7 @@ class Client(commands.Bot):
         self.tree.add_command(qotd_group)
         self.tree.add_command(modhelp_group)
         self.tree.add_command(art_group)
+        self.tree.add_command(ai_group)  
 
         #TEMP ONLY IF DUPE COMMANDS
         #self.tree.clear_commands(guild=None)
