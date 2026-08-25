@@ -173,12 +173,12 @@ async def modhelp_setup(interaction: discord.Interaction):
         await interaction.response.send_message("Error: Ticket channel not found.", ephemeral=True)
         return
 
-   title_embed = discord.Embed(
+    title_embed = discord.Embed(
         title=MENU_PANEL["title"],
         description=MENU_PANEL["description"],
         color=discord.Color.from_str(MENU_PANEL["color"]),
     )
-    title_embed.set_image(url="attachment://hodhelp_header.png")
+    title_embed.set_image(url="attachment://modhelp_header.png")
 
     await channel.send(embed=title_embed, view=MenuView())
     await interaction.response.send_message("Mod issue self-checkout menu sent!", ephemeral=True)
