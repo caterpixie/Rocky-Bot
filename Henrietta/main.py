@@ -40,7 +40,12 @@ from art import (
     art_group,
     set_bot as set_art_bot,
     ArtPanelView,
-)                            
+) 
+from moddinghelp import (
+    modhelp_group,
+    set_bot as set_modhelp_bot,
+    MenuView,
+)
 
 # =========================
 # CONFIG
@@ -113,12 +118,14 @@ class Client(commands.Bot):
         set_confessions_bot(self)
         set_uwu_bot(self)
         set_qotd_bot(self)
+        set_modhelp_bot(self)
         set_art_bot(self)          
 
         self.add_view(TicketPanelView())
         self.add_view(CloseTicketView())
         self.add_view(ConfirmCloseView())
         self.add_view(ConfessionInteractionView(self))
+        self.add_view(MenuView())
         self.add_view(ArtPanelView())
         register_qotd_views(self)
 
@@ -128,6 +135,7 @@ class Client(commands.Bot):
         self.tree.add_command(ticket_group)
         self.tree.add_command(confession_group)
         self.tree.add_command(reply_to_confession_context)
+        self.tree.add_command(modhelp_group)
         self.tree.add_command(uwu)
         self.tree.add_command(qotd_group)
         self.tree.add_command(art_group)
