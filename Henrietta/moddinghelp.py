@@ -180,6 +180,6 @@ async def modhelp_setup(interaction: discord.Interaction):
     )
     title_embed.set_image(url="attachment://modhelp-header.png")
     
-    await ticket_embed_channel.send(file=header_file)
+    await channel.send(file=header_file)
     await channel.send(embed=title_embed, view=MenuView())
     await interaction.response.send_message("Mod issue self-checkout menu sent!", ephemeral=True)
