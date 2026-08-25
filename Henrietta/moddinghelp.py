@@ -178,7 +178,7 @@ async def modhelp_setup(interaction: discord.Interaction):
         description=MENU_PANEL["description"],
         color=discord.Color.from_str(MENU_PANEL["color"]),
     )
-    title_embed.set_image(url="attachment://modhelp_header.png")
+    title_embed.set_image(url="attachment://modhelp-header.png")
 
     await channel.send(embed=title_embed, view=MenuView())
     await interaction.response.send_message("Mod issue self-checkout menu sent!", ephemeral=True)
