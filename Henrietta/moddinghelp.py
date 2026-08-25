@@ -82,8 +82,6 @@ def set_bot(bot_instance):
     global bot
     bot = bot_instance
 
-header_file = discord.File("modhelp-header.png", filename="modhelp-header.png")
-
 async def _log_menu_selection(interaction: discord.Interaction, option_key: str, option_label: str):
     if not MODHELP_LOG_CHANNEL_ID:
         return
@@ -172,6 +170,8 @@ async def modhelp_setup(interaction: discord.Interaction):
     if not channel:
         await interaction.response.send_message("Error: Ticket channel not found.", ephemeral=True)
         return
+
+    header_file = discord.File("modhelp-header.png", filename="modhelp-header.png")
 
     title_embed = discord.Embed(
         title=MENU_PANEL["title"],
