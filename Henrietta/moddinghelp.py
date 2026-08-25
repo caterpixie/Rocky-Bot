@@ -8,7 +8,7 @@ from tickets import TICKET_CHANNEL_ID
 # CONFIGURATION
 # ============================================================
 
-MODHELP_LOG_CHANNEL_ID = 1483328460213719123
+MODHELP_LOG_CHANNEL_ID = 1487175733884354650
 
 MENU_PANEL = {
     "title": "<:x_staricon:1523500147085021318> Mod Issue Self-Checkout",
