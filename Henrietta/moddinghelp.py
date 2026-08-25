@@ -82,6 +82,7 @@ def set_bot(bot_instance):
     global bot
     bot = bot_instance
 
+header_file = discord.File("modhelp-header.png", filename="modhelp-header.png")
 
 async def _log_menu_selection(interaction: discord.Interaction, option_key: str, option_label: str):
     if not MODHELP_LOG_CHANNEL_ID:
@@ -108,13 +109,6 @@ async def _log_menu_selection(interaction: discord.Interaction, option_key: str,
     except (discord.Forbidden, discord.HTTPException):
         pass
 
-
-def _build_MENU_embed() -> discord.Embed:
-    return discord.Embed(
-        title=MENU_PANEL["title"],
-        description=MENU_PANEL["description"],
-        color=discord.Color.from_str(MENU_PANEL["color"]),
-    )
 
 
 class MenuSelect(ui.Select):
@@ -179,6 +173,12 @@ async def modhelp_setup(interaction: discord.Interaction):
         await interaction.response.send_message("Error: Ticket channel not found.", ephemeral=True)
         return
 
-    await channel.send(embed=_build_MENU_embed(), view=MenuView())
+   title_embed = discord.Embed(
+        title=MENU_PANEL["title"],
+        description=MENU_PANEL["description"],
+        color=discord.Color.from_str(MENU_PANEL["color"]),
+    )
+    title_embed.set_image(url="attachment://hodhelp_header.png")
 
+    await channel.send(embed=title_embed, view=MenuView())
     await interaction.response.send_message("Mod issue self-checkout menu sent!", ephemeral=True)
