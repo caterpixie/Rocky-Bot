@@ -171,7 +171,7 @@ class ConfessionSubmitModal(Modal, title="Submit a Confession"):
         style=discord.TextStyle.short,
         required=False,
         max_length=256,
-        placeholder="Optional is you want to sign your confessions. I recommend using a unique emoji before your name as well!",
+        placeholder="Optionally sign your confessions. I recommend using a unique emoji before your name as well!",
     )
 
     async def on_submit(self, interaction: discord.Interaction):
