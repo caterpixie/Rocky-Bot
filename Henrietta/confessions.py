@@ -181,7 +181,7 @@ class ConfessionSubmitModal(Modal, title="Submit a Confession"):
         style=discord.TextStyle.short,
         required=False,
         max_length=256,
-        placeholder="Leave blank to stay fully anonymous",
+        placeholder="Optional: Sign your confession!",
     )
 
     async def on_submit(self, interaction: discord.Interaction):
