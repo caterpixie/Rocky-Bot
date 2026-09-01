@@ -115,6 +115,16 @@ def remove_pending_confession(message_id):
     except Exception as e:
         print(f"[ERROR] Removing pending confession: {e}")
 
+def get_pending_confession(message_id):
+    try:
+        if os.path.exists(PENDING_CONFESSIONS_FILE):
+            with open(PENDING_CONFESSIONS_FILE, "r") as f:
+                pending = json.load(f)
+            return pending.get(str(message_id))
+    except Exception as e:
+        print(f"[ERROR] Reading pending confession: {e}")
+    return None
+
 def safe_avatar_url(user):
     return user.avatar.url if user.avatar else None
 
@@ -171,7 +181,7 @@ class ConfessionSubmitModal(Modal, title="Submit a Confession"):
         style=discord.TextStyle.short,
         required=False,
         max_length=256,
-        placeholder="Optionally sign your confessions. I recommend using a unique emoji before your name as well!",
+        placeholder="Leave blank to stay fully anonymous",
     )
 
     async def on_submit(self, interaction: discord.Interaction):
@@ -277,6 +287,11 @@ class ApprovalView(View):
 
     @discord.ui.button(label="✅ Approve", style=discord.ButtonStyle.success, custom_id="approval_approve")
     async def approve(self, interaction: discord.Interaction, button: Button):
+        if get_pending_confession(interaction.message.id) is None:
+            await interaction.response.send_message("This has already been reviewed.", ephemeral=True)
+            return
+        remove_pending_confession(interaction.message.id)
+
         channel = interaction.guild.get_channel(CONFESSION_CHANNEL_ID)
         logchannel = interaction.guild.get_channel(CONFESSION_LOGS_CHANNEL_ID)
 
@@ -296,7 +311,7 @@ class ApprovalView(View):
             )
 
         if self.author_name:
-            embed.set_author(name=self.author_name)
+            embed.add_field(name="Signed by", value=self.author_name, inline=False)
 
         new_message = await channel.send(embed=embed, view=ConfessionInteractionView(bot))
 
@@ -312,8 +327,10 @@ class ApprovalView(View):
         set_latest_confession_id(new_message.id)
 
         await interaction.response.send_message("Approved and posted!", ephemeral=True)
-        remove_pending_confession(interaction.message.id)
-        await interaction.message.delete()
+        try:
+            await interaction.message.delete()
+        except discord.NotFound:
+            pass
 
         logembed = discord.Embed(
             title=f"{'Reply' if self.type == 'reply' else 'Confession'} Approved (#{self.confession_number})",
@@ -329,6 +346,11 @@ class ApprovalView(View):
 
     @discord.ui.button(label="❌ Deny", style=discord.ButtonStyle.danger, custom_id="approval_deny")
     async def deny(self, interaction: discord.Interaction, button: Button):
+        if get_pending_confession(interaction.message.id) is None:
+            await interaction.response.send_message("This has already been reviewed.", ephemeral=True)
+            return
+        remove_pending_confession(interaction.message.id)
+
         logchannel = interaction.guild.get_channel(CONFESSION_LOGS_CHANNEL_ID)
 
         # Attempt to DM the submitter
@@ -346,8 +368,10 @@ class ApprovalView(View):
             pass  # User has DMs closed
 
         await interaction.response.send_message("Confession denied.", ephemeral=True)
-        remove_pending_confession(interaction.message.id)
-        await interaction.message.delete()
+        try:
+            await interaction.message.delete()
+        except discord.NotFound:
+            pass
 
         logembed = discord.Embed(
             title=f"Confession Denied (#{self.confession_number})",
@@ -361,6 +385,9 @@ class ApprovalView(View):
 
     @discord.ui.button(label="💬 Deny with Reason", style=discord.ButtonStyle.danger, custom_id="approval_denyreason")
     async def deny_with_reason(self, interaction: discord.Interaction, button: Button):
+        if get_pending_confession(interaction.message.id) is None:
+            await interaction.response.send_message("This has already been reviewed.", ephemeral=True)
+            return
         await interaction.response.send_modal(DenyReasonModal(
             self.submitter,
             self.confession_text,
@@ -379,6 +406,11 @@ class DenyReasonModal(Modal, title="Deny Confession with Reason"):
         self.guild = guild
 
     async def on_submit(self, interaction: discord.Interaction):
+        if get_pending_confession(interaction.message.id) is None:
+            await interaction.response.send_message("This has already been reviewed.", ephemeral=True)
+            return
+        remove_pending_confession(interaction.message.id)
+
         logchannel = interaction.guild.get_channel(CONFESSION_LOGS_CHANNEL_ID)
         embed = discord.Embed(
             title="Your Denied Confession",
@@ -407,8 +439,10 @@ class DenyReasonModal(Modal, title="Deny Confession with Reason"):
             ephemeral=True
         )
 
-        remove_pending_confession(interaction.message.id)
-        await interaction.message.delete()
+        try:
+            await interaction.message.delete()
+        except discord.NotFound:
+            pass
 
         logembed = discord.Embed(
             title=f"Confession Denied (#{self.confession_number})",
@@ -534,4 +568,3 @@ async def denial_log(interaction: discord.Interaction, user: discord.Member):
 @app_commands.context_menu(name="Reply to Confession")
 async def reply_to_confession_context(interaction: discord.Interaction, message: discord.Message):
     await interaction.response.send_modal(ConfessionReplyModal(message.id))
-
