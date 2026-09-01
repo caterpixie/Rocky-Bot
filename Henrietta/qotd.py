@@ -184,7 +184,6 @@ class DenyReasonModal(ui.Modal, title="Deny QOTD Suggestion"):
             denied_embed.add_field(name="Reason", value=reason_text, inline=False)
         await self.review_message.edit(embed=denied_embed, view=None)
 
-        # DM the submitter, mirroring the confessions denial embed style
         dm_embed = discord.Embed(
             description="Your QOTD Suggestion Wasn't Approved",
             color=discord.Color.red(),
@@ -207,7 +206,6 @@ class DenyReasonModal(ui.Modal, title="Deny QOTD Suggestion"):
             except discord.Forbidden:
                 pass
 
-        # Log the denial to the QOTD log channel
         log_channel = interaction.guild.get_channel(QOTD_LOG_CHANNEL_ID) if QOTD_LOG_CHANNEL_ID else None
         if log_channel:
             log_embed = discord.Embed(
@@ -272,7 +270,9 @@ class QOTDReviewView(ui.View):
                 )
                 await cur.execute("DELETE FROM qotd_suggestions WHERE id = %s", (suggestion["id"],))
 
-        # DM the submitter that their suggestion was approved
+        await interaction.response.send_message("Approved and added to the queue!", ephemeral=True)
+        await interaction.message.delete()
+
         dm_embed = discord.Embed(
             description="Your QOTD Suggestion Was Approved!",
             color=discord.Color.green(),
@@ -290,7 +290,6 @@ class QOTDReviewView(ui.View):
             except discord.Forbidden:
                 pass
 
-        # Log the approval to the QOTD log channel
         log_channel = interaction.guild.get_channel(QOTD_LOG_CHANNEL_ID) if QOTD_LOG_CHANNEL_ID else None
         if log_channel:
             log_embed = discord.Embed(
