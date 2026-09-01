@@ -166,10 +166,18 @@ class ConfessionInteractionView(View):
 
 class ConfessionSubmitModal(Modal, title="Submit a Confession"):
     confession = TextInput(label="Your Confession", style=discord.TextStyle.paragraph, required=True)
+    author_name = TextInput(
+        label="Author Name (optional)",
+        style=discord.TextStyle.short,
+        required=False,
+        max_length=256,
+        placeholder="Leave blank to stay fully anonymous",
+    )
 
     async def on_submit(self, interaction: discord.Interaction):
         confession_number = get_next_confession_number()
         approval_channel = interaction.guild.get_channel(CONFESSION_APPROVAL_CHANNEL_ID)
+        author_name_value = str(self.author_name) if str(self.author_name) else None
 
         embed = discord.Embed(
             title=f"Confession Awaiting Review (#{confession_number})",
@@ -177,8 +185,10 @@ class ConfessionSubmitModal(Modal, title="Submit a Confession"):
             colour=discord.Color.from_str(COLOR_CONFESSION)
         )
         embed.add_field(name="User", value=f"||{interaction.user.name} (`{interaction.user.id}`)||")
+        if author_name_value:
+            embed.add_field(name="Author Name", value=author_name_value, inline=False)
 
-        view = ApprovalView(self.confession.value, interaction.user, confession_number)
+        view = ApprovalView(self.confession.value, interaction.user, confession_number, author_name=author_name_value)
         approval_message = await approval_channel.send(embed=embed, view=view)
 
         log_pending_confession(approval_message.id, {
@@ -187,13 +197,21 @@ class ConfessionSubmitModal(Modal, title="Submit a Confession"):
             "submitter_name": interaction.user.name,
             "confession_number": confession_number,
             "type": "confession",
-            "reply_to_message_id": None
+            "reply_to_message_id": None,
+            "author_name": author_name_value
         })
 
         await interaction.response.send_message("Your confession has been submitted!", ephemeral=True)
 
 class ConfessionReplyModal(Modal, title="Reply to a Confession"):
     reply = TextInput(label="Your Reply", style=discord.TextStyle.paragraph, required=True)
+    author_name = TextInput(
+        label="Author Name (optional)",
+        style=discord.TextStyle.short,
+        required=False,
+        max_length=256,
+        placeholder="Leave blank to stay fully anonymous",
+    )
 
     def __init__(self, original_message_id: int):
         super().__init__()
@@ -210,6 +228,7 @@ class ConfessionReplyModal(Modal, title="Reply to a Confession"):
 
         confession_number = get_next_confession_number()
         approval_channel = interaction.guild.get_channel(CONFESSION_APPROVAL_CHANNEL_ID)
+        author_name_value = str(self.author_name) if str(self.author_name) else None
 
         embed = discord.Embed(
             title=f"Reply Awaiting Review (#{confession_number})",
@@ -217,6 +236,8 @@ class ConfessionReplyModal(Modal, title="Reply to a Confession"):
             color=discord.Color.from_str(COLOR_REPLY)
         )
         embed.add_field(name="User", value=f"||{interaction.user.name} (`{interaction.user.id}`)||")
+        if author_name_value:
+            embed.add_field(name="Author Name", value=author_name_value, inline=False)
         embed.add_field(
             name="Original Message",
             value=f"[Jump to message](https://discord.com/channels/{interaction.guild.id}/{channel.id}/{self.original_message_id})",
@@ -228,7 +249,8 @@ class ConfessionReplyModal(Modal, title="Reply to a Confession"):
             submitter=interaction.user,
             confession_number=confession_number,
             type="reply",
-            reply_to_message_id=self.original_message_id
+            reply_to_message_id=self.original_message_id,
+            author_name=author_name_value
         )
         approval_message = await approval_channel.send(embed=embed, view=view)
 
@@ -238,18 +260,20 @@ class ConfessionReplyModal(Modal, title="Reply to a Confession"):
             "submitter_name": interaction.user.name,
             "confession_number": confession_number,
             "type": "reply",
-            "reply_to_message_id": self.original_message_id
+            "reply_to_message_id": self.original_message_id,
+            "author_name": author_name_value
         })
         await interaction.response.send_message("Your reply has been submitted!", ephemeral=True)
 
 class ApprovalView(View):
-    def __init__(self, confession_text, submitter, confession_number, type="confession", reply_to_message_id=None):
+    def __init__(self, confession_text, submitter, confession_number, type="confession", reply_to_message_id=None, author_name=None):
         super().__init__(timeout=None)
         self.confession_text = confession_text
         self.confession_number = confession_number
         self.submitter = submitter
         self.type = type
         self.reply_to_message_id = reply_to_message_id
+        self.author_name = author_name
 
     @discord.ui.button(label="✅ Approve", style=discord.ButtonStyle.success, custom_id="approval_approve")
     async def approve(self, interaction: discord.Interaction, button: Button):
@@ -270,6 +294,9 @@ class ApprovalView(View):
                 description=f"\"{self.confession_text}\"",
                 color=discord.Color.from_str(COLOR_CONFESSION)
             )
+
+        if self.author_name:
+            embed.set_author(name=self.author_name)
 
         new_message = await channel.send(embed=embed, view=ConfessionInteractionView(bot))
 
@@ -294,6 +321,8 @@ class ApprovalView(View):
             color=discord.Color.green()
         )
         logembed.add_field(name="User", value=f"||{self.submitter.name} (`{self.submitter.id}`)||")
+        if self.author_name:
+            logembed.add_field(name="Author Name", value=self.author_name, inline=False)
         logembed.add_field(name="Approved By", value=f"{interaction.user.mention}", inline=False)
 
         await logchannel.send(embed=logembed)
@@ -398,7 +427,7 @@ class ConfessionGroup(app_commands.Group):
 confession_group = ConfessionGroup()
 
 @confession_group.command(name="submit", description="Post a confession")
-async def submit_confession(interaction: discord.Interaction, confession: str):
+async def submit_confession(interaction: discord.Interaction, confession: str, author_name: str = None):
     confession_number = get_next_confession_number()
 
     approval_channel = interaction.guild.get_channel(CONFESSION_APPROVAL_CHANNEL_ID)
@@ -412,8 +441,10 @@ async def submit_confession(interaction: discord.Interaction, confession: str):
         colour=discord.Color.from_str(COLOR_CONFESSION)
     )
     embed.add_field(name="User", value=f"||{interaction.user.name} (`{interaction.user.id}`)||")
+    if author_name:
+        embed.add_field(name="Author Name", value=author_name, inline=False)
 
-    view = ApprovalView(confession, interaction.user, confession_number)
+    view = ApprovalView(confession, interaction.user, confession_number, author_name=author_name)
     approval_message = await approval_channel.send(embed=embed, view=view)
 
     log_pending_confession(approval_message.id, {
@@ -422,7 +453,8 @@ async def submit_confession(interaction: discord.Interaction, confession: str):
         "submitter_name": interaction.user.name,
         "confession_number": confession_number,
         "type": "confession",
-        "reply_to_message_id": None
+        "reply_to_message_id": None,
+        "author_name": author_name
     })
     await interaction.response.send_message("Confession submitted!", ephemeral=True)
 
