@@ -160,30 +160,30 @@ class ArtModal(ui.Modal, title="Submit Your Art"):
         )
         self.add_item(ui.Label(text="Spoiler these images?", component=self.spoiler_select))
 
-        async def on_submit(self, interaction: discord.Interaction):
-            attachments = self.image_upload.values
-        
-            valid_attachments = [
-                a for a in attachments
-                if a.content_type and (a.content_type.startswith("image/") or a.content_type.startswith("video/"))
-            ]
-        
-            if not valid_attachments:
-                await interaction.response.send_message(
-                    "No valid images or videos were attached. Click **Submit Art** again to retry.",
-                    ephemeral=True,
-                )
-                return
-        
-            await interaction.response.defer(ephemeral=True, thinking=True)
-        
-            art_channel = bot.get_channel(ART_CHANNEL_ID) or interaction.channel
-        
-            is_spoiler = bool(self.spoiler_select.values) and self.spoiler_select.values[0] == "yes"
-            files = [
-                await attachment.to_file(filename=f"art_{index}_{attachment.filename}", spoiler=is_spoiler)
-                for index, attachment in enumerate(valid_attachments)
-            ]
+    async def on_submit(self, interaction: discord.Interaction):
+        attachments = self.image_upload.values
+
+        valid_attachments = [
+            a for a in attachments
+            if a.content_type and (a.content_type.startswith("image/") or a.content_type.startswith("video/"))
+        ]
+
+        if not valid_attachments:
+            await interaction.response.send_message(
+                "No valid images or videos were attached. Click **Submit Art** again to retry.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+        art_channel = bot.get_channel(ART_CHANNEL_ID) or interaction.channel
+
+        is_spoiler = bool(self.spoiler_select.values) and self.spoiler_select.values[0] == "yes"
+        files = [
+            await attachment.to_file(filename=f"art_{index}_{attachment.filename}", spoiler=is_spoiler)
+            for index, attachment in enumerate(valid_attachments)
+        ]
 
         embed = discord.Embed(
             description=self.description_input.value or None,
@@ -207,8 +207,7 @@ class ArtModal(ui.Modal, title="Submit Your Art"):
             f"Your art has been posted! {posted_message.jump_url}",
             ephemeral=True,
         )
-
-
+        
 def _looks_like_url(text: str) -> bool:
     return text.startswith("http://") or text.startswith("https://")
 
