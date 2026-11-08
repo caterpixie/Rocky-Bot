@@ -50,6 +50,7 @@ from birthday import (
     birthday_group,
     set_bot as set_birthday_bot,
     ensure_tables as ensure_birthday_tables,
+    register_persistent_views as register_birthday_views,
     birthday_loop,
 )
 
@@ -136,6 +137,7 @@ class Client(commands.Bot):
         self.add_view(MenuView())
         self.add_view(ArtPanelView())
         register_qotd_views(self)
+        register_birthday_views(self)
 
         await restore_pending_confessions(self)
         
