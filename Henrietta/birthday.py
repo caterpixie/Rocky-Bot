@@ -15,19 +15,19 @@ from discord.ext import tasks
 # =========================
 # CONFIGURATION
 # =========================
-BIRTHDAY_CHANNEL_ID = 1568811315378790480       
-BIRTHDAY_ROLE_ID = 1568805784685650032     
-BIRTHDAY_PING_ROLE_ID = 1568819614647980062     
+BIRTHDAY_CHANNEL_ID = 1568804992675086438       
+BIRTHDAY_ROLE_ID = 1568805784685650032           
+BIRTHDAY_PING_ROLE_ID = 1568805784685650032      
 BIRTHDAY_MOD_ROLE_ID = 1486955771303301291       
 
 EMBED_COLOR = "#FFC6D6"
-STICKY_DEBOUNCE_SECONDS = 3
+STICKY_DEBOUNCE_SECONDS = 30  
 
 PANEL = {
     "title": "🎂 Birthdays",
     "description": (
         "Use the buttons below to set, view or remove your birthday.\n\n"
-        "On your birthday, you get an announcement in this channel and the birthday role for 24 hours. "
+        "On your birthday you get an announcement in this channel and the birthday role for 24 hours. "
         "Everything you do with these buttons is private to you."
     ),
 }
@@ -241,7 +241,7 @@ def parse_time(text: str) -> Optional[tuple[int, int]]:
 def validate_date(month: int, day: int, year: Optional[int]) -> Optional[str]:
     """Returns an error message, or None if the date is valid."""
     if year is None:
-        if day > calendar.monthrange(2024, month)[1]: 
+        if day > calendar.monthrange(2024, month)[1]:  
             return f"{calendar.month_name[month]} doesn't have {day} days."
         return None
     today = _utcnow().date()
@@ -266,7 +266,7 @@ def _occurrence(row: dict, year: int) -> datetime:
 def _current_window(row: dict, now: datetime) -> Optional[tuple[datetime, int]]:
     """If the 24h birthday window is open at `now`, returns (start, local_year), else None."""
     local_year = now.astimezone(ZoneInfo(row["timezone"])).year
-    for year in (local_year, local_year - 1): 
+    for year in (local_year, local_year - 1):  
         start = _occurrence(row, year)
         if start <= now < start + ROLE_DURATION:
             return start, year
@@ -411,7 +411,6 @@ async def _announce_due():
             if row["last_announced_at"] and row["last_announced_at"] >= start_db:
                 continue
 
-           
             async with bot.pool.acquire() as conn:
                 async with conn.cursor() as cur:
                     await cur.execute(
@@ -593,7 +592,6 @@ async def _save_birthday(
     row = await _get_birthday(interaction.guild.id, interaction.user.id)
     now = _utcnow()
 
-
     announce_now = False
     window = _current_window(row, now)
     if window:
@@ -610,7 +608,7 @@ async def _save_birthday(
                     """,
                     (_to_db(start), interaction.guild.id, interaction.user.id, _to_db(start)),
                 )
-   
+
                 announce_now = cur.rowcount == 1 and not recently_announced
 
     next_start = _next_occurrence(row, now)
@@ -749,7 +747,6 @@ async def test_announcement(interaction: discord.Interaction, member: discord.Me
 
     await interaction.response.defer(ephemeral=True)
 
-    # Use the member's real settings when they have them, so the age display can be previewed too.
     age = None
     row = await _get_birthday(interaction.guild.id, member.id)
     if row:
@@ -836,7 +833,7 @@ async def _on_message_for_sticky(message: discord.Message):
     if not BIRTHDAY_CHANNEL_ID or message.channel.id != BIRTHDAY_CHANNEL_ID:
         return
     if message.author.id == bot.user.id and message.components:
-        return  # the panel itself
+        return  
 
     if _pending_repost_task and not _pending_repost_task.done():
         _pending_repost_task.cancel()
@@ -919,16 +916,16 @@ class BirthdayPanelView(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @ui.button(label="Set Birthday", emoji="🎂", style=discord.ButtonStyle.primary, custom_id="birthday_panel:set")
+    @ui.button(label="Set Birthday", emoji="🎂", style=discord.ButtonStyle.secondary, custom_id="birthday_panel:set")
     async def open_set_form(self, interaction: discord.Interaction, button: ui.Button):
         existing = await _get_birthday(interaction.guild.id, interaction.user.id)
         await interaction.response.send_modal(SetBirthdayModal(existing))
 
-    @ui.button(label="View Birthday", emoji="👀", style=discord.ButtonStyle.secondary, custom_id="birthday_panel:view")
+    @ui.button(label="View Birthday", emoji="🔍", style=discord.ButtonStyle.secondary, custom_id="birthday_panel:view")
     async def view_own(self, interaction: discord.Interaction, button: ui.Button):
         await _send_own_birthday(interaction)
 
-    @ui.button(label="Remove Birthday", emoji="🗑️", style=discord.ButtonStyle.danger, custom_id="birthday_panel:remove")
+    @ui.button(label="Remove Birthday", emoji="🗑️", style=discord.ButtonStyle.secondary, custom_id="birthday_panel:remove")
     async def remove_own(self, interaction: discord.Interaction, button: ui.Button):
         await _remove_own_birthday(interaction)
 
