@@ -15,10 +15,10 @@ from discord.ext import tasks
 # =========================
 # CONFIGURATION
 # =========================
-BIRTHDAY_CHANNEL_ID = 1568804992675086438       
+BIRTHDAY_CHANNEL_ID = 1568811315378790480       
 BIRTHDAY_ROLE_ID = 1568805784685650032           
-BIRTHDAY_PING_ROLE_ID = 1568805784685650032      
-BIRTHDAY_MOD_ROLE_ID = 1486955771303301291       
+BIRTHDAY_PING_ROLE_ID = 1568819614647980062     
+BIRTHDAY_MOD_ROLE_ID = 1486955771303301291      
 
 EMBED_COLOR = "#FFC6D6"
 STICKY_DEBOUNCE_SECONDS = 30  
@@ -27,7 +27,7 @@ PANEL = {
     "title": "🎂 Birthdays",
     "description": (
         "Use the buttons below to set, view or remove your birthday.\n\n"
-        "On your birthday you get an announcement in this channel and the birthday role for 24 hours. "
+        "On your birthday, you get an announcement in this channel and the birthday role for 24 hours. "
         "Everything you do with these buttons is private to you."
     ),
 }
@@ -221,7 +221,7 @@ def parse_time(text: str) -> Optional[tuple[int, int]]:
     match = _TIME_RE.match(text)
     if not match:
         return None
-    if match.group(4) is not None:  
+    if match.group(4) is not None:
         hour, minute = int(match.group(4)), int(match.group(5))
         meridiem = None
     else:
@@ -608,7 +608,7 @@ async def _save_birthday(
                     """,
                     (_to_db(start), interaction.guild.id, interaction.user.id, _to_db(start)),
                 )
-
+             
                 announce_now = cur.rowcount == 1 and not recently_announced
 
     next_start = _next_occurrence(row, now)
@@ -832,6 +832,8 @@ async def _on_message_for_sticky(message: discord.Message):
     global _pending_repost_task
     if not BIRTHDAY_CHANNEL_ID or message.channel.id != BIRTHDAY_CHANNEL_ID:
         return
+    if message.flags.ephemeral:
+        return  
     if message.author.id == bot.user.id and message.components:
         return  
 
@@ -916,7 +918,7 @@ class BirthdayPanelView(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @ui.button(label="Set Birthday", emoji="🎂", style=discord.ButtonStyle.secondary, custom_id="birthday_panel:set")
+    @ui.button(label="Set Birthday", emoji="🥳", style=discord.ButtonStyle.secondary, custom_id="birthday_panel:set")
     async def open_set_form(self, interaction: discord.Interaction, button: ui.Button):
         existing = await _get_birthday(interaction.guild.id, interaction.user.id)
         await interaction.response.send_modal(SetBirthdayModal(existing))
