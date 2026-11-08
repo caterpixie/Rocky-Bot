@@ -1,3 +1,4 @@
+import asyncio
 import calendar
 import re
 import traceback
@@ -8,18 +9,28 @@ from zoneinfo import ZoneInfo, available_timezones
 
 import aiomysql
 import discord
-from discord import app_commands
+from discord import app_commands, ui
 from discord.ext import tasks
 
 # =========================
 # CONFIGURATION
 # =========================
 BIRTHDAY_CHANNEL_ID = 1568811315378790480       
-BIRTHDAY_ROLE_ID = 1568805784685650032         
-BIRTHDAY_PING_ROLE_ID = 1568819614647980062      
-BIRTHDAY_MOD_ROLE_ID = 1486955771303301291    
+BIRTHDAY_ROLE_ID = 1568805784685650032     
+BIRTHDAY_PING_ROLE_ID = 1568819614647980062     
+BIRTHDAY_MOD_ROLE_ID = 1486955771303301291       
 
 EMBED_COLOR = "#FFC6D6"
+STICKY_DEBOUNCE_SECONDS = 3
+
+PANEL = {
+    "title": "🎂 Birthdays",
+    "description": (
+        "Use the buttons below to set, view or remove your birthday.\n\n"
+        "On your birthday, you get an announcement in this channel and the birthday role for 24 hours. "
+        "Everything you do with these buttons is private to you."
+    ),
+}
 ROLE_DURATION = timedelta(hours=24)
 
 THREAD_AUTO_ARCHIVE_MINUTES = 1440
@@ -46,6 +57,7 @@ bot = None
 def set_bot(bot_instance):
     global bot
     bot = bot_instance
+    bot.add_listener(_on_message_for_sticky, "on_message")
     for name, value in (
         ("BIRTHDAY_CHANNEL_ID", BIRTHDAY_CHANNEL_ID),
         ("BIRTHDAY_ROLE_ID", BIRTHDAY_ROLE_ID),
@@ -93,6 +105,13 @@ TABLES = [
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
     """
+    CREATE TABLE IF NOT EXISTS sticky_messages (
+        channel_id BIGINT UNSIGNED NOT NULL,
+        message_id BIGINT UNSIGNED NOT NULL,
+        PRIMARY KEY (channel_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
+    """
     CREATE TABLE IF NOT EXISTS birthday_roles (
         guild_id BIGINT UNSIGNED NOT NULL,
         user_id BIGINT UNSIGNED NOT NULL,
@@ -130,10 +149,71 @@ _TZ_NAMES = sorted(_TZ_LOOKUP.values())
 
 _TIME_RE = re.compile(r"^\s*(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m?\.?\s*$|^\s*(\d{1,2}):(\d{2})\s*$", re.I)
 
+_TZ_ALIASES = {
+    "est": "America/New_York", "edt": "America/New_York", "et": "America/New_York",
+    "cst": "America/Chicago", "cdt": "America/Chicago", "ct": "America/Chicago",
+    "mst": "America/Denver", "mdt": "America/Denver", "mt": "America/Denver",
+    "pst": "America/Los_Angeles", "pdt": "America/Los_Angeles", "pt": "America/Los_Angeles",
+}
+
 
 def resolve_timezone(text: str) -> Optional[str]:
     """Returns the canonical IANA name for user input, or None if it is not a valid timezone."""
-    return _TZ_LOOKUP.get(text.strip().replace(" ", "_").lower())
+    key = text.strip().replace(" ", "_").lower()
+    return _TZ_LOOKUP.get(_TZ_ALIASES.get(key, key).lower())
+
+
+def timezone_help(text: str) -> str:
+    needle = text.strip().replace(" ", "_").lower()
+    matches = [n for n in _TZ_NAMES if needle and needle in n.lower()][:5]
+    if matches:
+        options = ", ".join(f"`{n}`" for n in matches)
+        return f"I don't recognise that timezone. Did you mean one of these? {options}"
+    return (
+        "I don't recognise that timezone. Use a name like `America/New_York` or `Europe/London` "
+        "(full list: <https://en.wikipedia.org/wiki/List_of_tz_database_time_zones>)."
+    )
+
+
+_MONTHS = {name.lower(): i for i, name in enumerate(calendar.month_name) if name}
+_MONTHS.update({name.lower(): i for i, name in enumerate(calendar.month_abbr) if name})
+_MONTHS["sept"] = 9
+
+
+def parse_month_day(text: str) -> tuple[int, int]:
+    """Parses 'March 5', 'Mar 5th', '5 March', '15/3'. Raises ValueError with a user-facing message.
+    Numeric dates are rejected when they can be read two ways (3/5), so a wrong month can't slip through."""
+    cleaned = re.sub(r"(?<=\d)(st|nd|rd|th)\b", "", text.strip().lower())
+    cleaned = cleaned.replace(",", " ").strip()
+    unreadable = ValueError("I couldn't read that date. Write it like `March 5`.")
+
+    month_first = re.fullmatch(r"([a-z]+)\.?\s*(\d{1,2})", cleaned)
+    day_first = re.fullmatch(r"(\d{1,2})\s*([a-z]+)\.?", cleaned)
+    numeric = re.fullmatch(r"(\d{1,2})\s*[/.\-]\s*(\d{1,2})", cleaned)
+
+    if month_first:
+        name, day = month_first.group(1), int(month_first.group(2))
+    elif day_first:
+        day, name = int(day_first.group(1)), day_first.group(2)
+    elif numeric:
+        a, b = int(numeric.group(1)), int(numeric.group(2))
+        if a <= 12 and b <= 12 and a != b:
+            raise ValueError(
+                f"`{text.strip()}` could mean {calendar.month_name[a]} {b} or {calendar.month_name[b]} {a}. "
+                "Write the month as a word instead, like `March 5`."
+            )
+        month, day = (a, b) if (b > 12 or a == b) else (b, a)
+        if not 1 <= month <= 12 or not 1 <= day <= 31:
+            raise unreadable
+        return month, day
+    else:
+        raise unreadable
+
+    if name not in _MONTHS:
+        raise ValueError(f"I don't recognise the month `{name}`. Write it like `March 5`.")
+    if not 1 <= day <= 31:
+        raise unreadable
+    return _MONTHS[name], day
 
 
 def parse_time(text: str) -> Optional[tuple[int, int]]:
@@ -141,7 +221,7 @@ def parse_time(text: str) -> Optional[tuple[int, int]]:
     match = _TIME_RE.match(text)
     if not match:
         return None
-    if match.group(4) is not None: 
+    if match.group(4) is not None:  
         hour, minute = int(match.group(4)), int(match.group(5))
         meridiem = None
     else:
@@ -161,7 +241,7 @@ def parse_time(text: str) -> Optional[tuple[int, int]]:
 def validate_date(month: int, day: int, year: Optional[int]) -> Optional[str]:
     """Returns an error message, or None if the date is valid."""
     if year is None:
-        if day > calendar.monthrange(2024, month)[1]:  
+        if day > calendar.monthrange(2024, month)[1]: 
             return f"{calendar.month_name[month]} doesn't have {day} days."
         return None
     today = _utcnow().date()
@@ -186,7 +266,7 @@ def _occurrence(row: dict, year: int) -> datetime:
 def _current_window(row: dict, now: datetime) -> Optional[tuple[datetime, int]]:
     """If the 24h birthday window is open at `now`, returns (start, local_year), else None."""
     local_year = now.astimezone(ZoneInfo(row["timezone"])).year
-    for year in (local_year, local_year - 1):  
+    for year in (local_year, local_year - 1): 
         start = _occurrence(row, year)
         if start <= now < start + ROLE_DURATION:
             return start, year
@@ -331,7 +411,7 @@ async def _announce_due():
             if row["last_announced_at"] and row["last_announced_at"] >= start_db:
                 continue
 
-
+           
             async with bot.pool.acquire() as conn:
                 async with conn.cursor() as cur:
                     await cur.execute(
@@ -449,6 +529,110 @@ async def _get_birthday(guild_id: int, user_id: int):
             return await cur.fetchone()
 
 
+async def _save_birthday(
+    interaction: discord.Interaction,
+    month: int,
+    day: int,
+    tz_input: str,
+    time_text: str,
+    year: Optional[int],
+    show_age: Optional[bool],
+    *,
+    clear_year: bool = False,
+):
+    """Validates and saves a birthday. Used by both /birthday set and the panel's pop-up form.
+    `year=None` keeps the saved birth year unless `clear_year` is True."""
+    tz = resolve_timezone(tz_input)
+    if tz is None:
+        await interaction.response.send_message(timezone_help(tz_input), ephemeral=True)
+        return
+
+    parsed = parse_time(time_text)
+    if parsed is None:
+        await interaction.response.send_message(
+            "I couldn't read that time. Try something like `9:00 AM`, `9pm` or `14:30`.", ephemeral=True
+        )
+        return
+    hour, minute = parsed
+
+    existing = await _get_birthday(interaction.guild.id, interaction.user.id)
+    if year is not None:
+        final_year = year
+    elif clear_year:
+        final_year = None
+    else:
+        final_year = existing["birth_year"] if existing else None
+    final_show_age = show_age if show_age is not None else (bool(existing["show_age"]) if existing else False)
+
+    error = validate_date(month, day, final_year)
+    if error:
+        await interaction.response.send_message(error, ephemeral=True)
+        return
+    if final_show_age and final_year is None:
+        await interaction.response.send_message(
+            "To show your age I need your birth year. Add your birth year and try again.", ephemeral=True
+        )
+        return
+
+    async with bot.pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                INSERT INTO birthdays (guild_id, user_id, month, day, hour, minute, timezone, birth_year, show_age)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    month = VALUES(month), day = VALUES(day), hour = VALUES(hour), minute = VALUES(minute),
+                    timezone = VALUES(timezone), birth_year = VALUES(birth_year), show_age = VALUES(show_age)
+                """,
+                (
+                    interaction.guild.id, interaction.user.id, month, day, hour, minute,
+                    tz, final_year, final_show_age,
+                ),
+            )
+
+    row = await _get_birthday(interaction.guild.id, interaction.user.id)
+    now = _utcnow()
+
+
+    announce_now = False
+    window = _current_window(row, now)
+    if window:
+        start, window_year = window
+        previous = existing["last_announced_at"] if existing else None
+        recently_announced = previous is not None and previous > _to_db(now - ROLE_DURATION)
+        async with bot.pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """
+                    UPDATE birthdays SET last_announced_at = %s
+                    WHERE guild_id = %s AND user_id = %s
+                      AND (last_announced_at IS NULL OR last_announced_at < %s)
+                    """,
+                    (_to_db(start), interaction.guild.id, interaction.user.id, _to_db(start)),
+                )
+   
+                announce_now = cur.rowcount == 1 and not recently_announced
+
+    next_start = _next_occurrence(row, now)
+    age_text = "shown" if final_show_age else "hidden"
+    extra = "\nYour birthday is happening right now, so you're getting the birthday role and an announcement! 🎂" if announce_now else ""
+    await interaction.response.send_message(
+        f"Saved! Your birthday is **{calendar.month_name[month]} {day}** at "
+        f"**{_format_time(hour, minute)}** ({tz}). Your age is **{age_text}**.\n"
+        f"Next announcement: <t:{int(next_start.timestamp())}:F>{extra}",
+        ephemeral=True,
+    )
+
+    if announce_now:
+        try:
+            await _grant_role(interaction.guild, interaction.user, now + ROLE_DURATION)
+            await _send_announcement(interaction.guild, interaction.user, _age_for(row, window_year), is_test=False)
+        except Exception:
+            print(f"[BIRTHDAY] Failed to announce immediately for user {interaction.user.id}:")
+            traceback.print_exc()
+
+
+
 @birthday_group.command(name="set", description="Set your birthday, announcement time and timezone")
 @app_commands.describe(
     month="Month of your birthday",
@@ -470,90 +654,7 @@ async def set_birthday(
     year: Optional[int] = None,
     show_age: Optional[bool] = None,
 ):
-    tz = resolve_timezone(tz_name)
-    if tz is None:
-        await interaction.response.send_message(
-            "I don't recognise that timezone. Start typing a city or region (like `America/New_York`) and pick one from the list.",
-            ephemeral=True,
-        )
-        return
-
-    parsed = parse_time(time)
-    if parsed is None:
-        await interaction.response.send_message(
-            "I couldn't read that time. Try something like `9:00 AM`, `9pm` or `14:30`.", ephemeral=True
-        )
-        return
-    hour, minute = parsed
-
-    existing = await _get_birthday(interaction.guild.id, interaction.user.id)
-    final_year = year if year is not None else (existing["birth_year"] if existing else None)
-    final_show_age = show_age if show_age is not None else (bool(existing["show_age"]) if existing else False)
-
-    error = validate_date(month.value, day, final_year)
-    if error:
-        await interaction.response.send_message(error, ephemeral=True)
-        return
-    if final_show_age and final_year is None:
-        await interaction.response.send_message(
-            "To show your age I need your birth year. Add the `year` option.", ephemeral=True
-        )
-        return
-
-    async with bot.pool.acquire() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                """
-                INSERT INTO birthdays (guild_id, user_id, month, day, hour, minute, timezone, birth_year, show_age)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                    month = VALUES(month), day = VALUES(day), hour = VALUES(hour), minute = VALUES(minute),
-                    timezone = VALUES(timezone), birth_year = VALUES(birth_year), show_age = VALUES(show_age)
-                """,
-                (
-                    interaction.guild.id, interaction.user.id, month.value, day, hour, minute,
-                    tz, final_year, final_show_age,
-                ),
-            )
-
-    row = await _get_birthday(interaction.guild.id, interaction.user.id)
-    now = _utcnow()
-
-    announce_now = False
-    window = _current_window(row, now)
-    if window:
-        start, window_year = window
-        previous = existing["last_announced_at"] if existing else None
-        recently_announced = previous is not None and previous > _to_db(now - ROLE_DURATION)
-        async with bot.pool.acquire() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(
-                    """
-                    UPDATE birthdays SET last_announced_at = %s
-                    WHERE guild_id = %s AND user_id = %s
-                      AND (last_announced_at IS NULL OR last_announced_at < %s)
-                    """,
-                    (_to_db(start), interaction.guild.id, interaction.user.id, _to_db(start)),
-                )
-                announce_now = cur.rowcount == 1 and not recently_announced
-
-    next_start = _next_occurrence(row, now)
-    age_text = "shown" if final_show_age else "hidden"
-    extra = "\nYour birthday is happening right now, so you're getting the birthday role and an announcement! 🎂" if announce_now else ""
-    await interaction.response.send_message(
-        f"Saved! Your birthday is **{calendar.month_name[month.value]} {day}** at "
-        f"**{_format_time(hour, minute)}** ({tz}). Your age is **{age_text}**.\n"
-        f"Next announcement: <t:{int(next_start.timestamp())}:F>{extra}",
-        ephemeral=True,
-    )
-
-    if announce_now:
-        try:
-            await _grant_role(interaction.guild, interaction.user, now + ROLE_DURATION)
-            await _send_announcement(interaction.guild, interaction.user, _age_for(row, window_year), is_test=False)
-        except Exception:
-            print(f"[BIRTHDAY] Failed to announce immediately for user {interaction.user.id}:")
-            traceback.print_exc()
+    await _save_birthday(interaction, month.value, day, tz_name, time, year, show_age)
 
 
 @birthday_group.command(name="age", description="Choose whether your age appears in your birthday announcement")
@@ -581,21 +682,14 @@ async def set_age_visibility(interaction: discord.Interaction, show: bool):
     )
 
 
-@birthday_group.command(name="view", description="View your saved birthday, or someone else's date")
-@app_commands.describe(member="Whose birthday to look up (defaults to you)")
-async def view_birthday(interaction: discord.Interaction, member: Optional[discord.Member] = None):
-    target = member or interaction.user
-    row = await _get_birthday(interaction.guild.id, target.id)
+async def _send_own_birthday(interaction: discord.Interaction):
+    row = await _get_birthday(interaction.guild.id, interaction.user.id)
     if not row:
-        who = "You haven't" if target.id == interaction.user.id else f"{target.display_name} hasn't"
-        await interaction.response.send_message(f"{who} set a birthday.", ephemeral=True)
+        await interaction.response.send_message(
+            "You haven't set a birthday yet. Use the **Set Birthday** button or `/birthday set`.", ephemeral=True
+        )
         return
-
     date_text = f"{calendar.month_name[row['month']]} {row['day']}"
-    if target.id != interaction.user.id:
-        await interaction.response.send_message(f"{target.display_name}'s birthday is **{date_text}**.", ephemeral=True)
-        return
-
     next_start = _next_occurrence(row, _utcnow())
     year_text = row["birth_year"] if row["birth_year"] else "not set"
     await interaction.response.send_message(
@@ -608,8 +702,22 @@ async def view_birthday(interaction: discord.Interaction, member: Optional[disco
     )
 
 
-@birthday_group.command(name="remove", description="Delete your saved birthday")
-async def remove_birthday(interaction: discord.Interaction):
+@birthday_group.command(name="view", description="View your saved birthday, or someone else's date")
+@app_commands.describe(member="Whose birthday to look up (defaults to you)")
+async def view_birthday(interaction: discord.Interaction, member: Optional[discord.Member] = None):
+    if member is None or member.id == interaction.user.id:
+        await _send_own_birthday(interaction)
+        return
+    row = await _get_birthday(interaction.guild.id, member.id)
+    if not row:
+        await interaction.response.send_message(f"{member.display_name} hasn't set a birthday.", ephemeral=True)
+        return
+    await interaction.response.send_message(
+        f"{member.display_name}'s birthday is **{calendar.month_name[row['month']]} {row['day']}**.", ephemeral=True
+    )
+
+
+async def _remove_own_birthday(interaction: discord.Interaction):
     async with bot.pool.acquire() as conn:
         async with conn.cursor() as cur:
             await cur.execute(
@@ -620,6 +728,11 @@ async def remove_birthday(interaction: discord.Interaction):
     await interaction.response.send_message(
         "Your birthday was removed." if removed else "You didn't have a birthday saved.", ephemeral=True
     )
+
+
+@birthday_group.command(name="remove", description="Delete your saved birthday")
+async def remove_birthday(interaction: discord.Interaction):
+    await _remove_own_birthday(interaction)
 
 
 @birthday_group.command(name="test", description="Post a test birthday announcement (mods only)")
@@ -636,6 +749,7 @@ async def test_announcement(interaction: discord.Interaction, member: discord.Me
 
     await interaction.response.defer(ephemeral=True)
 
+    # Use the member's real settings when they have them, so the age display can be previewed too.
     age = None
     row = await _get_birthday(interaction.guild.id, member.id)
     if row:
@@ -652,3 +766,188 @@ async def test_announcement(interaction: discord.Interaction, member: discord.Me
         "It pinged the birthday role and the member, but no birthday role was assigned.",
         ephemeral=True,
     )
+
+
+# =========================
+# STICKY PANEL
+# =========================
+_pending_repost_task: Optional[asyncio.Task] = None
+
+
+async def _get_sticky_message_id(channel_id: int) -> Optional[int]:
+    async with bot.pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute("SELECT message_id FROM sticky_messages WHERE channel_id = %s", (channel_id,))
+            row = await cur.fetchone()
+            return row[0] if row else None
+
+
+async def _set_sticky_message_id(channel_id: int, message_id: int):
+    async with bot.pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                INSERT INTO sticky_messages (channel_id, message_id) VALUES (%s, %s)
+                ON DUPLICATE KEY UPDATE message_id = VALUES(message_id)
+                """,
+                (channel_id, message_id),
+            )
+
+
+def _build_panel_embed() -> discord.Embed:
+    return discord.Embed(
+        title=PANEL["title"],
+        description=PANEL["description"],
+        color=discord.Color.from_str(EMBED_COLOR),
+    )
+
+
+async def _repost_panel(channel: discord.abc.Messageable):
+    """Deletes the old panel (if any) and posts a fresh one at the bottom of the channel."""
+    old_message_id = await _get_sticky_message_id(channel.id)
+    if old_message_id:
+        try:
+            old_message = await channel.fetch_message(old_message_id)
+            await old_message.delete()
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            pass
+
+    new_message = await channel.send(embed=_build_panel_embed(), view=BirthdayPanelView())
+    await _set_sticky_message_id(channel.id, new_message.id)
+
+
+async def _debounced_repost(channel: discord.abc.Messageable):
+    global _pending_repost_task
+    try:
+        await asyncio.sleep(STICKY_DEBOUNCE_SECONDS)
+        await _repost_panel(channel)
+    except asyncio.CancelledError:
+        pass
+    except Exception:
+        print("[BIRTHDAY] Could not repost the birthday panel:")
+        traceback.print_exc()
+    finally:
+        if _pending_repost_task is asyncio.current_task():
+            _pending_repost_task = None
+
+
+async def _on_message_for_sticky(message: discord.Message):
+    global _pending_repost_task
+    if not BIRTHDAY_CHANNEL_ID or message.channel.id != BIRTHDAY_CHANNEL_ID:
+        return
+    if message.author.id == bot.user.id and message.components:
+        return  # the panel itself
+
+    if _pending_repost_task and not _pending_repost_task.done():
+        _pending_repost_task.cancel()
+    _pending_repost_task = asyncio.create_task(_debounced_repost(message.channel))
+
+
+# =========================
+# PANEL BUTTONS AND FORM
+# =========================
+class SetBirthdayModal(ui.Modal, title="Set Your Birthday"):
+    def __init__(self, existing: Optional[dict] = None):
+        super().__init__()
+        existing = existing or {}
+        saved_date = f"{calendar.month_name[existing['month']]} {existing['day']}" if existing else None
+        saved_time = _format_time(existing["hour"], existing["minute"]) if existing else None
+        saved_show_age = bool(existing.get("show_age"))
+
+        self.date_input = ui.TextInput(placeholder="March 5", max_length=20, default=saved_date)
+        self.time_input = ui.TextInput(
+            placeholder="9:00 AM (leave blank for midnight)", required=False, max_length=12, default=saved_time
+        )
+        self.timezone_input = ui.TextInput(
+            placeholder="America/New_York", max_length=64, default=existing.get("timezone")
+        )
+        self.year_input = ui.TextInput(
+            placeholder="Optional, needed to show your age",
+            required=False,
+            max_length=4,
+            default=str(existing["birth_year"]) if existing.get("birth_year") else None,
+        )
+        self.age_select = ui.Select(
+            options=[
+                discord.SelectOption(label="Don't show my age", value="no", default=not saved_show_age),
+                discord.SelectOption(label="Show my age", value="yes", default=saved_show_age),
+            ],
+            min_values=1,
+            max_values=1,
+        )
+
+        self.add_item(ui.Label(text="Birthday (month and day)", component=self.date_input))
+        self.add_item(ui.Label(text="Announcement time (optional)", component=self.time_input))
+        self.add_item(ui.Label(text="Timezone", component=self.timezone_input))
+        self.add_item(ui.Label(text="Birth year (optional)", component=self.year_input))
+        self.add_item(ui.Label(text="Show your age in the announcement?", component=self.age_select))
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            month, day = parse_month_day(self.date_input.value)
+        except ValueError as e:
+            await interaction.response.send_message(f"{e} Click **Set Birthday** to try again.", ephemeral=True)
+            return
+
+        year_text = (self.year_input.value or "").strip()
+        year = None
+        if year_text:
+            if not year_text.isdigit():
+                await interaction.response.send_message(
+                    "Your birth year should be a number like `2001`. Click **Set Birthday** to try again.",
+                    ephemeral=True,
+                )
+                return
+            year = int(year_text)
+
+        show_age = bool(self.age_select.values) and self.age_select.values[0] == "yes"
+        await _save_birthday(
+            interaction,
+            month,
+            day,
+            self.timezone_input.value,
+            (self.time_input.value or "").strip() or DEFAULT_TIME,
+            year,
+            show_age,
+            clear_year=True,
+        )
+
+
+class BirthdayPanelView(ui.View):
+    """The buttons on the sticky panel. Persistent across restarts."""
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @ui.button(label="Set Birthday", emoji="🎂", style=discord.ButtonStyle.primary, custom_id="birthday_panel:set")
+    async def open_set_form(self, interaction: discord.Interaction, button: ui.Button):
+        existing = await _get_birthday(interaction.guild.id, interaction.user.id)
+        await interaction.response.send_modal(SetBirthdayModal(existing))
+
+    @ui.button(label="View Birthday", emoji="👀", style=discord.ButtonStyle.secondary, custom_id="birthday_panel:view")
+    async def view_own(self, interaction: discord.Interaction, button: ui.Button):
+        await _send_own_birthday(interaction)
+
+    @ui.button(label="Remove Birthday", emoji="🗑️", style=discord.ButtonStyle.danger, custom_id="birthday_panel:remove")
+    async def remove_own(self, interaction: discord.Interaction, button: ui.Button):
+        await _remove_own_birthday(interaction)
+
+
+def register_persistent_views(bot_instance):
+    """Call once at startup so the panel buttons keep working after a restart."""
+    bot_instance.add_view(BirthdayPanelView())
+
+
+@birthday_group.command(name="panel", description="Post the sticky birthday panel in the birthday channel (mods only)")
+async def post_panel(interaction: discord.Interaction):
+    if not _can_manage(interaction.user):
+        await interaction.response.send_message("You don't have permission to post the birthday panel.", ephemeral=True)
+        return
+    channel = interaction.guild.get_channel(BIRTHDAY_CHANNEL_ID) if BIRTHDAY_CHANNEL_ID else None
+    if channel is None:
+        await interaction.response.send_message(
+            "The birthday channel isn't configured. Set `BIRTHDAY_CHANNEL_ID` in birthday.py.", ephemeral=True
+        )
+        return
+    await _repost_panel(channel)
+    await interaction.response.send_message(f"Birthday panel posted in {channel.mention}.", ephemeral=True)
