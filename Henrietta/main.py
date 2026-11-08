@@ -46,6 +46,13 @@ from moddinghelp import (
     set_bot as set_modhelp_bot,
     MenuView,
 )
+from birthday import (
+    birthday_group,
+    set_bot as set_birthday_bot,
+    ensure_tables as ensure_birthday_tables,
+    register_persistent_views as register_birthday_views,
+    birthday_loop,
+)
 
 # =========================
 # CONFIG
@@ -119,7 +126,9 @@ class Client(commands.Bot):
         set_uwu_bot(self)
         set_qotd_bot(self)
         set_modhelp_bot(self)
-        set_art_bot(self)          
+        set_art_bot(self)
+        set_birthday_bot(self)
+        await ensure_birthday_tables()
 
         self.add_view(TicketPanelView())
         self.add_view(CloseTicketView())
@@ -128,6 +137,7 @@ class Client(commands.Bot):
         self.add_view(MenuView())
         self.add_view(ArtPanelView())
         register_qotd_views(self)
+        register_birthday_views(self)
 
         await restore_pending_confessions(self)
         
@@ -139,6 +149,7 @@ class Client(commands.Bot):
         self.tree.add_command(uwu)
         self.tree.add_command(qotd_group)
         self.tree.add_command(art_group)
+        self.tree.add_command(birthday_group)
 
         #TEMP ONLY IF DUPE COMMANDS
         #self.tree.clear_commands(guild=None)
@@ -152,6 +163,9 @@ class Client(commands.Bot):
 
         if not auto_post_qotd.is_running():
             auto_post_qotd.start()
+
+        if not birthday_loop.is_running():
+            birthday_loop.start()
 
         print(f"Synced commands to guild {GUILD_ID}: {[cmd.name for cmd in synced]}")
 
