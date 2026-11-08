@@ -65,58 +65,6 @@ def _can_manage(member: discord.Member) -> bool:
         return any(role.id == BIRTHDAY_MOD_ROLE_ID for role in member.roles)
     return False
  
- 
-# =========================
-# DATABASE SETUP
-# =========================
-# birthdays.last_announced_at, birthday_roles.expires_at are naive UTC datetimes.
-TABLES = [
-    """
-    CREATE TABLE IF NOT EXISTS birthdays (
-        guild_id BIGINT UNSIGNED NOT NULL,
-        user_id BIGINT UNSIGNED NOT NULL,
-        month TINYINT UNSIGNED NOT NULL,
-        day TINYINT UNSIGNED NOT NULL,
-        hour TINYINT UNSIGNED NOT NULL DEFAULT 0,
-        minute TINYINT UNSIGNED NOT NULL DEFAULT 0,
-        timezone VARCHAR(64) NOT NULL,
-        birth_year SMALLINT UNSIGNED NULL,
-        show_age BOOLEAN NOT NULL DEFAULT FALSE,
-        last_announced_at DATETIME NULL,
-        PRIMARY KEY (guild_id, user_id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS birthday_gifs (
-        id INT NOT NULL AUTO_INCREMENT,
-        guild_id BIGINT UNSIGNED NOT NULL,
-        url VARCHAR(500) NOT NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (id),
-        UNIQUE KEY uq_birthday_gif (guild_id, url)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS birthday_roles (
-        guild_id BIGINT UNSIGNED NOT NULL,
-        user_id BIGINT UNSIGNED NOT NULL,
-        expires_at DATETIME NOT NULL,
-        PRIMARY KEY (guild_id, user_id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    """,
-]
- 
- 
-async def ensure_tables():
-    """Creates the birthday tables if they do not exist yet."""
-    async with bot.pool.acquire() as conn:
-        async with conn.cursor() as cur:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")  # MySQL notes "table already exists" on every start
-                for statement in TABLES:
-                    await cur.execute(statement)
- 
- 
 # =========================
 # TIME HELPERS
 # =========================
@@ -165,7 +113,7 @@ def parse_time(text: str) -> Optional[tuple[int, int]]:
 def validate_date(month: int, day: int, year: Optional[int]) -> Optional[str]:
     """Returns an error message, or None if the date is valid."""
     if year is None:
-        if day > calendar.monthrange(2024, month)[1]:  # 2024 is a leap year, so Feb 29 is allowed
+        if day > calendar.monthrange(2024, month)[1]: 
             return f"{calendar.month_name[month]} doesn't have {day} days."
         return None
     today = _utcnow().date()
@@ -190,7 +138,7 @@ def _occurrence(row: dict, year: int) -> datetime:
 def _current_window(row: dict, now: datetime) -> Optional[tuple[datetime, int]]:
     """If the 24h birthday window is open at `now`, returns (start, local_year), else None."""
     local_year = now.astimezone(ZoneInfo(row["timezone"])).year
-    for year in (local_year, local_year - 1):  # previous year covers windows that cross New Year
+    for year in (local_year, local_year - 1):
         start = _occurrence(row, year)
         if start <= now < start + ROLE_DURATION:
             return start, year
@@ -335,7 +283,6 @@ async def _announce_due():
             if row["last_announced_at"] and row["last_announced_at"] >= start_db:
                 continue
  
-            # Claim this birthday first so a slow tick or a restart can never announce it twice.
             async with bot.pool.acquire() as conn:
                 async with conn.cursor() as cur:
                     await cur.execute(
@@ -523,8 +470,6 @@ async def set_birthday(
     row = await _get_birthday(interaction.guild.id, interaction.user.id)
     now = _utcnow()
  
-    # If the birthday is happening right now, announce it and give the role for 24h from now.
-    # The window is always marked as handled so the scheduler can't announce it a second time.
     announce_now = False
     window = _current_window(row, now)
     if window:
@@ -540,8 +485,7 @@ async def set_birthday(
                       AND (last_announced_at IS NULL OR last_announced_at < %s)
                     """,
                     (_to_db(start), interaction.guild.id, interaction.user.id, _to_db(start)),
-                )
-                # Re-running /birthday set later the same day must not announce again.
+                
                 announce_now = cur.rowcount == 1 and not recently_announced
  
     next_start = _next_occurrence(row, now)
@@ -642,8 +586,7 @@ async def test_announcement(interaction: discord.Interaction, member: discord.Me
         return
  
     await interaction.response.defer(ephemeral=True)
- 
-    # Use the member's real settings when they have them, so the age display can be previewed too.
+
     age = None
     row = await _get_birthday(interaction.guild.id, member.id)
     if row:
